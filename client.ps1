@@ -1,4 +1,4 @@
-﻿[cmdletbinding()]
+[cmdletbinding()]
 param(
       [string]
       $filterDescription = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$"
