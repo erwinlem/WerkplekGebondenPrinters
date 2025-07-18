@@ -19,7 +19,14 @@ directory.  Als opslag worden files gebruikt met de hostname.
 # Verbeterpunten
 
 * Script maken wat aangeroepen kan worden als er gewisseld wordt van werkplek.
-* Filteren op hostname zodat thuiswerkers.
+* Filteren op hostname zodat thuiswerkers hun machine namen er niet inkomen (bijv. wr_b81oiunmoul).
 * Meer feedback over wat er op de achtergrond gebeurd (printers toevoegen gaat
   niet snel).
+* Config file met instellingen.
+* Betere logging.
+* Details over printer bij selecteren (printserver/sticker type etc).
 
+# Tips
+
+* Zet "Bestandssysteemomleiding uitschakelen op 64-bit systemen" aan in Ivanti,
+  dit zorgt ervoor dat het allemaal wat rapper gaat.
