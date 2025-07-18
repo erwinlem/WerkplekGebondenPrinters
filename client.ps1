@@ -4,8 +4,10 @@ param(
       $filterDescription = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$"
 )
 
+Import-Module activedirectory
 Add-Type -AssemblyName System.Drawing
 Add-Type -Assembly PresentationFramework
+
 
 write-verbose("starting, $PSScriptRoot");
 
@@ -38,14 +40,101 @@ function ConvertTo-BitmapImage {
     }
 }
 
-# Define a .NET class representing your data object
-class WindowData {
-    [string] $Status
+function waitcursor([bool] $a) {
+    # kan geen windows cursor dingen doen in class, superstom
+    if ($a) {
+        return [System.Windows.Input.Cursors]::Wait;
+    } else {
+        return [System.Windows.Input.Cursors]::Arrow;    
+    }
+
 }
 
-# Create an instance of the Person class
+# Define a .NET class representing your data object
+class WindowData {
+    [scriptblock] $butt_press = { 
+        write-verbose ("button press "+$args.Name);
+        switch ($args.Name) {
+            "butt_reset" {
+                write-verbose ("resetting")
+                refreshPrinters
+                refresh
+                refreshType
+                write-verbose ("klaar met resetting")
+            }
+            'butt_cancel' {
+                $Form.Close();        
+            }   
+            'butt_set' {
+                $r = $global:Datatable_type.Rows |? { $_.Type -eq $Form.FindName("printers").selecteditem.description};
+                $r.Printer = $Form.FindName("printers").selecteditem.printername;
+                $r.Locatie = $Form.FindName("printers").selecteditem.location;
+            }
+            'butt_unset' {
+                $r = $Form.FindName("printerType").selecteditem;
+                $r.Printer = "";
+                $r.Locatie = "";
+
+            }
+            'butt_ok' {
+                
+                $Form.Cursor =  waitcursor($true);
+                $printersNew = @($Form.FindName("printerType").Items |? { $_.Printer -notmatch "^$"} |% { $_.Printer });
+                $printersOld = @($printersCurrent |% { $_.sharename });
+
+                write-verbose("nieuwe printers : " + ($printersNew -join ",") );
+                write-verbose("oude printers : " + ( $printersOld -join ",") );
+
+                Compare-Object $printersNew $printersOld |? { $_.InputObject -ne $null }|% {
+
+                    # geen start-job gebruiken hiervoor : https://github.com/PowerShell/PowerShell/issues/11659
+                    $printer=  $_.InputObject;
+                    $printer = $printers |? { $_.printername -eq $printer } |% { $_.uncname -replace '.intranet.local', ''}
+
+                    write-verbose("printer " + ($_) );
+                    switch ($_.SideIndicator) {
+                        "==" {
+                            write-verbose "keeping "+$printer;
+                        }
+                        "<=" {
+                            write-verbose("printer $printer toevoegen" );
+                            Add-Printer -ConnectionName $printer;
+                            write-verbose("printer $printer toegevoegd" );
+                        }
+                        "=>" {
+                            write-verbose("weg printer " + ($printer) );
+                            get-printer |? { $_.name -eq $printer } | Remove-Printer
+                            write-verbose("weggehaald printer " + ($printer) );
+                        }
+                        default {
+                            write-verbose ("Geen idee wat dit is "+$printer);
+                        }
+
+                    }
+                }
+
+                refreshPrinters
+                $Form.Cursor = waitcursor($false);
+    
+                $printersNew |% {
+                    $printer = $_;
+                    $printers |? { $_.printername -eq $printer } |% { $_.uncname -replace '.intranet.local', ''}  
+                } | sort-object | out-file ("$PSScriptRoot\computers\"+$env:CLIENTNAME+".txt")
+                write-verbose "KLAAR!"
+            }
+
+        }  
+        
+    };
+    [string] $TB_Werkplek = "Werkplek - {0}" -f @( $env:CLIENTNAME);
+
+    ViewModel() {
+     #   $this.SayHello = { [System.Windows.MessageBox]::Show("Hello from DataContext!") }
+    }
+
+}
+
 $WindowData = [WindowData]::new()
-$WindowData.Status = "Haga Werkplekgebondenprinter v2.0"
 
 $global:selected_type = ""
 
@@ -77,11 +166,11 @@ refreshPrinters
 
 <Page>
    <Grid  Background="{DynamicResource Theme_BackgroundBrush}">
-        <TextBlock Name="TB_Werkplek" Text="Werkplek - MCxxxxxx" FontSize="20" Margin="8,8,0,8" HorizontalAlignment="Left" VerticalAlignment="Top" Height="32" Width="624" />
+        <TextBlock Name="TB_Werkplek" Text="{Binding TB_Werkplek}" FontSize="20" Margin="8,8,0,8" HorizontalAlignment="Left" VerticalAlignment="Top" Height="32" Width="624" />
         <TextBlock Text="Filter:" FontSize="14" Margin="648,16,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Height="24" />
         <TextBox Name="TB_Filter" Margin="720,8,4,8" FontSize="24" VerticalAlignment="Top" Height="32" IsEnabled="True"  />
         <Button Name="butt_set" Content="← GEBRUIK" Width="70" Height="40" Margin="640,108,4,4" VerticalAlignment="Top" HorizontalAlignment="Left"   />
-        <Button Name="butt_reset" Content="↺ Herstel" Width="70" Height="40" Margin="640,156,4,4" VerticalAlignment="Top" HorizontalAlignment="Left"   />
+        <Button Name="butt_reset" Command="{Binding SayHello}" Content="↺ Herstel" Width="70" Height="40" Margin="640,156,4,4" VerticalAlignment="Top" HorizontalAlignment="Left"   />
         <Button Name="butt_unset" Content="❌ Verwijder" Width="70" Height="40" Margin="640,206,4,4" VerticalAlignment="Top" HorizontalAlignment="Left"   />
         <DataGrid Name="printerType" ItemsSource="{Binding SampleData.Employees}" Margin="8,48,0,328" HorizontalAlignment="Left" Width="624" IsReadOnly="True" SelectionMode="Single" CanUserSortColumns="True"  />
         <DataGrid Name="printers"  ItemsSource="{Binding SampleData.Employees}" Margin="720,48,8,48"  IsReadOnly="True" SelectionMode="Single"  />
@@ -90,7 +179,6 @@ refreshPrinters
             <Button Name="butt_ok" Content="Toepassen" Margin="4,4,4,4" Width="100" />
         </StackPanel>
           <Image Name="img_voorbeeld" Margin="8,0,0,8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Width="320" Height="320" />
-          <TextBox Name="txt_status" Text="{Binding Status}" Margin="0,0,227,10" VerticalAlignment="Bottom" Height="20" HorizontalAlignment="Right" Width="416" />
     </Grid>
 </Page>
 </Window> 
@@ -98,7 +186,19 @@ refreshPrinters
 
 $Form=[Windows.Markup.XamlReader]::Load( (New-Object System.Xml.XmlNodeReader $XAML) )
 $Form.DataContext = $WindowData
-$Form.FindName('TB_Werkplek').Text = "Werkplek - {0}" -f @( $env:CLIENTNAME);
+
+# knoppen verbinden met class (powershell doet niet aan ICommand)
+"set unset ok reset cancel" -split " " |% {
+    $Form.FindName("butt_$($_)").add_Click($WindowData.butt_press)
+}
+
+# filter verbinden
+$Form.FindName('TB_Filter').add_TextChanged({
+    param([System.Windows.Controls.TextBox]$sender, $e)
+    refresh    
+})
+
+
 $Form.FindName('img_voorbeeld').Source = (ConvertTo-BitmapImage "$($PSScriptRoot)\voorbeeld\kat.png")
 
 $Form.FindName('printerType').AddHandler([System.Windows.Controls.DataGrid]::SelectionChangedEvent, [System.Windows.RoutedEventHandler] {
@@ -136,91 +236,6 @@ function refresh() {
     }
     $Datatable.DefaultView.RowFilter = $filter
 }
-
-$Form.FindName('butt_set').add_Click({
-    param([System.Windows.Controls.Button]$sender, $e)
-
-    $r = $global:Datatable_type.Rows |? { $_.Type -eq $Form.FindName("printers").selecteditem.description};
-    $r.Printer = $Form.FindName("printers").selecteditem.printername;
-    $r.Locatie = $Form.FindName("printers").selecteditem.location;
-})
-
-$Form.FindName('butt_unset').add_Click({
-    param([System.Windows.Controls.Button]$sender, $e)
-    $r = $Form.FindName("printerType").selecteditem;
-    $r.Printer = "";
-    $r.Locatie = "";
-
-})
-
-
-$Form.FindName('butt_ok').add_Click({
-    param([System.Windows.Controls.Button]$sender, $e)
-
-    $Form.Cursor = [System.Windows.Input.Cursors]::wait
-    $printersNew = @($Form.FindName("printerType").Items |? { $_.Printer -notmatch "^$"} |% { $_.Printer });
-    $printersOld = @($printersCurrent |% { $_.sharename });
-
-    write-verbose("nieuwe printers : " + ($printersNew -join ",") );
-    write-verbose("oude printers : " + ( $printersOld -join ",") );
-
-    Compare-Object $printersNew $printersOld |? { $_.InputObject -ne $null }|% {
-
-        # geen start-job gebruiken hiervoor : https://github.com/PowerShell/PowerShell/issues/11659
-        $printer=  $_.InputObject;
-        $printer = $printers |? { $_.printername -eq $printer } |% { $_.uncname -replace '.intranet.local', ''}
-
-        write-verbose("printer " + ($_) );
-        switch ($_.SideIndicator) {
-            "==" {
-                write-verbose "keeping "+$printer;
-            }
-            "<=" {
-                write-verbose("printer $printer toevoegen" );
-                Add-Printer -ConnectionName $printer;
-                write-verbose("printer $printer toegevoegd" );
-            }
-            "=>" {
-                write-verbose("weg printer " + ($printer) );
-                get-printer |? { $_.name -eq $printer } | Remove-Printer
-                write-verbose("weggehaald printer " + ($printer) );
-            }
-            default {
-                write-verbose ("Geen idee wat dit is "+$printer);
-            }
-
-        }
-    }
-
-    refreshPrinters
-    $Form.Cursor = [System.Windows.Input.Cursors]::Arrow;
-    
-    $printersNew |% {
-        $printer = $_;
-        $printers |? { $_.printername -eq $printer } |% { $_.uncname -replace '.intranet.local', ''}  
-    } | sort-object | out-file ("$PSScriptRoot\computers\"+$env:CLIENTNAME+".txt")
-    write-verbose "KLAAR!"
-})
-
-$Form.FindName('butt_reset').add_Click({
-    param([System.Windows.Controls.Button]$sender, $e)
-    write-verbose ("resetting")
-    refreshPrinters
-    refresh
-    refreshType
-    write-verbose ("klaar met resetting")
-})
-
-$Form.FindName('butt_cancel').add_Click({
-    param([System.Windows.Controls.Button]$sender, $e)
-    $Form.Close();
-})
-
-$Form.FindName('TB_Filter').add_TextChanged({
-    param([System.Windows.Controls.TextBox]$sender, $e)
-    refresh
-    
-})
 
 # setup detail view
 $printers |% {
