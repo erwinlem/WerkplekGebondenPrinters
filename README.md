@@ -16,6 +16,8 @@ hierdoor direct de juiste printer gebruiken voor een bepaald etiket.
 Het geheel is gebouwd in powershell, printers worden uitgelezen uit active
 directory.  Als opslag worden files gebruikt met de hostname.
 
+Powershell is echt te traag bij het opstarten, omgezet naar c#.
+
 # Verbeterpunten
 
 * Script maken wat aangeroepen kan worden als er gewisseld wordt van werkplek.
