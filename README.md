@@ -25,10 +25,7 @@ Powershell is echt te traag bij het opstarten, omgezet naar c#.
 * Meer feedback over wat er op de achtergrond gebeurd (printers toevoegen gaat
   niet snel).
 * Config file met instellingen.
-* Betere logging.
 * Details over printer bij selecteren (printserver/sticker type etc).
+* Server naam meenemen zodat dezelfde printernamen gebruikt kunnen worden.
 
 # Tips
-
-* Zet "Bestandssysteemomleiding uitschakelen op 64-bit systemen" aan in Ivanti,
-  dit zorgt ervoor dat het allemaal wat rapper gaat.

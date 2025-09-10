@@ -9,6 +9,7 @@ using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -66,7 +67,7 @@ namespace WerkplekGebondenPrinter {
     }
 
         public class WindowData {
-            public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.MachineName;
+            public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.GetEnvironmentVariable("CLIENTNAME");
             private string _TB_Filter;
             public string TB_Filter {
                 get => _TB_Filter;
@@ -129,13 +130,13 @@ namespace WerkplekGebondenPrinter {
             }
 
             public void setPrinter(string p) {
-                Console.WriteLine("Installed Printer: " + p);
+                Trace.TraceInformation("Installed Printer: " + p);
                 DataRow[] p2 = printerTable.Select("PrinterName = '" + p + "'");
                 if (p2.Length == 0) {
                     return; // printer niet gevonden in ad
                 }
                         ;
-                Console.WriteLine("type: " + p2[0][1]);
+                Trace.TraceInformation("type: " + p2[0][1]);
                 DataRow[] pt = printerTypeTable.Select("Type = '" + p2[0][1] + "'");
                 if (pt.Length == 0) {
                     return; // printer type niet gevonden
@@ -180,16 +181,18 @@ namespace WerkplekGebondenPrinter {
                 }
             }
 
-            public void AddPrinter(string printerPath) {
+        #region add/remove printer
+        public void AddPrinter(string printerPath) {
                 try {
+                    Trace.TraceInformation($"Adding Printer {printerPath}");
                     var managementClass = new ManagementClass("Win32_Printer");
                     var inputParams = managementClass.GetMethodParameters("AddPrinterConnection");
                     inputParams["Name"] = printerPath;
 
                     managementClass.InvokeMethod("AddPrinterConnection", inputParams, null);
-                    Console.WriteLine($"Printer added: {printerPath}");
+                    
                 } catch (Exception ex) {
-                    Console.WriteLine($"Failed to add printer {printerPath}: {ex.Message}");
+                    Trace.TraceError($"Failed to add printer {printerPath}: {ex.Message}");
                 }
             }
 
@@ -199,15 +202,16 @@ namespace WerkplekGebondenPrinter {
                     using (var searcher = new ManagementObjectSearcher(query)) {
                         foreach (ManagementObject printer in searcher.Get()) {
                             printer.Delete();
-                            Console.WriteLine($"Printer removed: {printerName}");
+                            Trace.TraceInformation($"Printer removed: {printerName}");
                         }
                     }
                 } catch (Exception ex) {
-                    Console.WriteLine($"Failed to remove printer {printerName}: {ex.Message}");
+                    Trace.TraceInformation($"Failed to remove printer {printerName}: {ex.Message}");
                 }
             }
+        #endregion
 
-            string xaml = @"
+        string xaml = @"
     <Grid xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
       xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{DynamicResource Theme_BackgroundBrush}'>
         <TextBlock Name='TB_Werkplek' Text='{Binding TB_Werkplek}' FontSize='20' Margin='8,8,0,8' HorizontalAlignment='Left' VerticalAlignment='Top' Height='32' Width='624' />
@@ -268,21 +272,25 @@ namespace WerkplekGebondenPrinter {
                     .Cast<dynamic>()
                     .Where(item => !string.IsNullOrEmpty((string)item.Row[1]))
                     .Select(item => (string)item.Row[1])
+                    .Select(item => printers.Where(x => (x.PrinterName == item)).ToArray()[0].UncName)
                     .ToList();
 
                 // Get old printers from printersCurrent
                 List<string> printersOld;
 
                 try {
-                    printersOld = PrinterSettings.InstalledPrinters.Cast<string>().Select(p => p.Split('\\').Last()).ToList();
+                    printersOld = PrinterSettings.InstalledPrinters
+                        .Cast<string>()
+                        .Where(item => printers.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
+                        .ToList();
                 } catch (Win32Exception e) {
                     // printspooler waarschijk disabled, TODO: vullen met dummy
                     return;
 
                 }
 
-                Console.WriteLine("nieuwe printers : " + string.Join(",", printersNew));
-                Console.WriteLine("oude printers : " + string.Join(",", printersOld));
+                Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew));
+                Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
 
                 var compare = printersNew
                     .Union(printersOld)
@@ -295,27 +303,26 @@ namespace WerkplekGebondenPrinter {
                     });
 
                 foreach (var entry in compare) {
-                    var printer = printers.FirstOrDefault(p => p.PrinterName == entry.Printer).PrinterName;
+                    var printer = entry.Printer;
 
-                    Console.WriteLine("printer " + entry.Printer);
+                    Trace.TraceInformation("printer " + entry.Printer);
 
                     switch (entry.Side) {
                         case "==":
-                            Console.WriteLine("keeping " + printer);
+                            Trace.TraceInformation("keeping " + printer);
                             break;
                         case "<=":
-                            Console.WriteLine("printer " + printer + " toevoegen");
-                            PrinterInfo pf = printers.Where(x => (x.PrinterName == printer)).ToArray()[0];
-                            AddPrinter(pf.UncName);
-                            Console.WriteLine("printer " + printer + " toegevoegd");
+                            Trace.TraceInformation("printer " + printer + " toevoegen");
+                            AddPrinter(printer);
+                            Trace.TraceInformation("printer " + printer + " toegevoegd");
                             break;
                         case "=>":
-                            Console.WriteLine("weg printer " + printer);
+                            Trace.TraceInformation("weg printer " + printer);
                             RemovePrinter(printer);
-                            Console.WriteLine("weggehaald printer " + printer);
+                            Trace.TraceInformation("weggehaald printer " + printer);
                             break;
                         default:
-                            Console.WriteLine("Geen idee wat dit is " + printer);
+                            Trace.TraceWarning("Geen idee wat dit is " + printer);
                             break;
                     }
                 }
@@ -332,7 +339,7 @@ namespace WerkplekGebondenPrinter {
 
                 File.WriteAllLines(outputPath, finalList);
 
-                Console.WriteLine("KLAAR!");
+                Trace.TraceInformation("KLAAR!");
             }
 
             public void Refresh() {
@@ -359,13 +366,37 @@ namespace WerkplekGebondenPrinter {
         }
 
         public class App : Application {
-            [STAThread]
-            public static void Main(string[] args) {
 
+        [STAThread]
+        public static int Main(string[] args) {
+            Trace.AutoFlush = true;
+            
+            Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
 
-                var app = new App();
-                var window = new MainWindow();
-                app.Run(window);
+            for (int i = 0; i < args.Length; i++) {
+                switch (args[i]) {
+                    case "-d":
+                    case "--debug":
+                        Trace.TraceInformation("Debug logging is AAN");
+                        break;
+                    case "-l":
+                        // TODO: voorkomen dat het op 2 regels komt
+                        var li = new TextWriterTraceListener(args[++i]);
+                        li.TraceOutputOptions = TraceOptions.DateTime;
+                        Trace.Listeners.Add(li);
+                        break;
+                    case "-v":
+                    default:
+                        Trace.TraceError($"Unknown argument: {args[i]}");
+                        return 1;
+                }
             }
+
+            var app = new App();
+            var window = new MainWindow();
+            app.Run(window);
+            Trace.WriteLine("Werkplekgebonenprinter wordt afgesloten");
+            return 0;
         }
     }
+}
