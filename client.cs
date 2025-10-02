@@ -325,7 +325,7 @@ namespace WerkplekGebondenPrinter {
             }
 
             var img = (Image)this.FindName("img_voorbeeld");
-            img.Source = LoadImage("voorbeeld/kat.png");
+            img.Source = LoadImage("voorbeeld/onbekend.png");
 
             ((TextBox)this.FindName("TB_Filter")).TextChanged += (s, e) => Refresh();
 
@@ -334,7 +334,7 @@ namespace WerkplekGebondenPrinter {
                 if (grid.SelectedItem is DataRowView row) {
                     selectedType = row[0].ToString(); // FIXME: "Description"
                     string path = "voorbeeld/" + selectedType + ".png";
-                    if (!File.Exists(path)) path = "voorbeeld/kat.png";
+                    if (!File.Exists(path)) path = "voorbeeld/onbekend.png";
                     img.Source = LoadImage(path);
                     Refresh();
                 }

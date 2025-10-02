@@ -55,7 +55,7 @@
     <Content Include="computers\dummie.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="voorbeeld\kat.png">
+    <Content Include="voorbeeld\onbekend.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
