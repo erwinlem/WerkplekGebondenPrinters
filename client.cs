@@ -9,7 +9,6 @@ using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Management;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -32,6 +31,16 @@ namespace WerkplekGebondenPrinter {
 
     public class Config {
         private const string FilterRegex = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$";
+        private List<PrinterInfo> printersAD;
+        public List<PrinterInfo> PrintersAD {
+            get {
+                if (printersAD == null) {
+                    printersAD = this.GetPrintersAD();
+                }
+                return printersAD;
+
+            }
+        }
 
         public List<PrinterInfo> GetPrintersAD() {
             var printers = new List<PrinterInfo>();
@@ -47,7 +56,7 @@ namespace WerkplekGebondenPrinter {
                     if (result.Properties.Contains("description")) {
                         desc = result.Properties["description"]?[0]?.ToString();
                     }
-                    if (Regex.IsMatch(desc, FilterRegex)) {
+                    if (Regex.IsMatch(desc, FilterRegex, RegexOptions.IgnoreCase)) {
                         var Location = "";
                         if (result.Properties.Contains("location")) {
                             Location = result.Properties["location"]?[0]?.ToString();
@@ -64,152 +73,224 @@ namespace WerkplekGebondenPrinter {
             }
             return printers;
         }
-    }
 
-        public class WindowData {
-            public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.GetEnvironmentVariable("CLIENTNAME");
-            private string _TB_Filter;
-            public string TB_Filter {
-                get => _TB_Filter;
-                set {
-                    _TB_Filter = value;
-                }
+        public List<string> GetInstalledWPGPrinters() {
+            try {
+                return PrinterSettings.InstalledPrinters
+                    .Cast<string>()
+                    .Where(item => PrintersAD.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
+                    .ToList();
+            } catch (Win32Exception e) {
+                // printspooler waarschijk disabled, TODO: vullen met dummy
+                return null;
+
+            }
+        }
+
+        public void SaveConfig(List<string> printersNew) {
+            // Save printer list to file
+            var outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
+            File.WriteAllLines(outputPath, printersNew);
+        }
+
+        public List<string> LoadConfig() {
+            var filename = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
+            try {
+                return new List<string>(File.ReadAllLines(filename));
+            } catch (Exception e) {
+                Trace.TraceError($"error reading file {filename}");
+                Trace.TraceError($"exception {e}");
+                return new List<string>();
             }
 
-            public void HandleButtonClick(string name, MainWindow window) {
-                switch (name) {
-                    case "butt_reset": window.LoadPrinters(); break;
-                    case "butt_cancel": window.Close(); break;
-                    case "butt_set":
-                        var s = ((DataRowView)((DataGrid)window.FindName("printers")).SelectedItem).Row[0];
-                        window.setPrinter(s.ToString());
+        }
+
+        public void ApplyConfig() {
+            ApplyPrintlist(LoadConfig(), GetInstalledWPGPrinters());
+        }
+
+        public void ApplyPrintlist(List<string> printersNew, List<string> printersOld) {
+            Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew));
+            Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
+
+            var compare = printersNew
+                .Union(printersOld)
+                .Distinct()
+                .Select(p => new {
+                    Printer = p,
+                    Side = printersNew.Contains(p) && printersOld.Contains(p) ? "==" :
+                           printersNew.Contains(p) ? "<=" :
+                           printersOld.Contains(p) ? "=>" : "?"
+                });
+
+            foreach (var entry in compare) {
+                var printer = entry.Printer;
+
+                Trace.TraceInformation("printer " + entry.Printer);
+
+                switch (entry.Side) {
+                    case "==":
+                        Trace.TraceInformation("keeping " + printer);
                         break;
-                    case "butt_unset":
-                        var type = ((DataRowView)((DataGrid)window.FindName("printerType")).SelectedItem).Row[0];
-                        window.clearPrinter(type.ToString());
+                    case "<=":
+                        Trace.TraceInformation("printer " + printer + " toevoegen");
+                        Config.AddPrinter(printer);
+                        Trace.TraceInformation("printer " + printer + " toegevoegd");
                         break;
-                    case "butt_ok":
-                        window.ApplyChanges();
+                    case "=>":
+                        Trace.TraceInformation("weg printer " + printer);
+                        Config.RemovePrinter(printer);
+                        Trace.TraceInformation("weggehaald printer " + printer);
+                        break;
+                    default:
+                        Trace.TraceWarning("Geen idee wat dit is " + printer);
                         break;
                 }
             }
         }
 
-        public class MainWindow : System.Windows.Window {
-            private WindowData viewModel = new WindowData();
-            private List<PrinterInfo> printers;
-            private DataTable printerTable = new DataTable();
-            private DataTable printerTypeTable = new DataTable();
-            private string selectedType = "";
-            Config config = new Config();
-
-            public MainWindow() {
-                DataContext = viewModel;
-
-                printerTable.Columns.Add("PrinterName");
-                printerTable.Columns.Add("Description");
-                printerTable.Columns.Add("Location");
-
-                printerTypeTable.Columns.Add("Type");
-                printerTypeTable.Columns.Add("Printer");
-                printerTypeTable.Columns.Add("Location");
-
-                LoadPrinters();
-                SetupUI();
-                this.Title = "Werkplekgebondenprinter 2.0";
-            }
-
-            public void clearPrinter(string type) {
-                DataRow[] pt = printerTypeTable.Select("Type = '" + type + "'");
-                if (pt.Length == 0) {
-                    return; // printer type niet gevonden
-                }
-                pt[0][1] = "";
-                pt[0][2] = "";
-
-            }
-
-            public void setPrinter(string p) {
-                Trace.TraceInformation("Installed Printer: " + p);
-                DataRow[] p2 = printerTable.Select("PrinterName = '" + p + "'");
-                if (p2.Length == 0) {
-                    return; // printer niet gevonden in ad
-                }
-                        ;
-                Trace.TraceInformation("type: " + p2[0][1]);
-                DataRow[] pt = printerTypeTable.Select("Type = '" + p2[0][1] + "'");
-                if (pt.Length == 0) {
-                    return; // printer type niet gevonden
-                }
-                pt[0][1] = p;
-                pt[0][2] = p2[0][2];
-            }
-
-            public void LoadPrinters() {
-
-                // active directory
-                printers = config.GetPrintersAD();
-
-                printerTable.Clear();
-
-                foreach (var p in printers)
-                    printerTable.Rows.Add(p.PrinterName, p.Description, p.Location);
-
-                // fill printertypes
-                var tmp = printers.GroupBy(x => x.Description)
-                          .Select(y => new {
-                              Type = y.Key,
-                              Printer = "",
-                              Location = "",
-                          });
-
-                printerTypeTable.Clear();
-
-                foreach (var p in tmp) {
-                    printerTypeTable.Rows.Add(p.Type, p.Printer, p.Location);
-                    Trace.WriteLine(p);
-                }
-
-                // computer printers
-                try {
-                    foreach (string printer in PrinterSettings.InstalledPrinters) {
-                        setPrinter(printer.Split('\\').Last());
-                    }
-                } catch (Win32Exception e) {
-                    // printspooler waarschijk disabled, TODO: vullen met dummy
-
-                }
-            }
-
         #region add/remove printer
-        public void AddPrinter(string printerPath) {
-                try {
-                    Trace.TraceInformation($"Adding Printer {printerPath}");
-                    var managementClass = new ManagementClass("Win32_Printer");
-                    var inputParams = managementClass.GetMethodParameters("AddPrinterConnection");
-                    inputParams["Name"] = printerPath;
+        public static void AddPrinter(string printerPath) {
+            try {
+                Trace.TraceInformation($"Adding Printer {printerPath}");
+                var managementClass = new ManagementClass("Win32_Printer");
+                var inputParams = managementClass.GetMethodParameters("AddPrinterConnection");
+                inputParams["Name"] = printerPath;
 
-                    managementClass.InvokeMethod("AddPrinterConnection", inputParams, null);
-                    
-                } catch (Exception ex) {
-                    Trace.TraceError($"Failed to add printer {printerPath}: {ex.Message}");
-                }
+                managementClass.InvokeMethod("AddPrinterConnection", inputParams, null);
+
+            } catch (Exception ex) {
+                Trace.TraceError($"Failed to add printer {printerPath}: {ex.Message}");
             }
+        }
 
-            public void RemovePrinter(string printerName) {
-                try {
-                    string query = $"SELECT * FROM Win32_Printer WHERE ShareName = '{printerName.Replace("\\", "\\\\")}'";
-                    using (var searcher = new ManagementObjectSearcher(query)) {
-                        foreach (ManagementObject printer in searcher.Get()) {
-                            printer.Delete();
-                            Trace.TraceInformation($"Printer removed: {printerName}");
-                        }
+        public static void RemovePrinter(string printerName) {
+            try {
+                string query = $"SELECT * FROM Win32_Printer WHERE Name = '{printerName.Replace("\\", "\\\\")}'";
+                using (var searcher = new ManagementObjectSearcher(query)) {
+                    foreach (ManagementObject printer in searcher.Get()) {
+                        Trace.TraceInformation($"removing: {printerName}");
+                        printer.Delete();
+                        Trace.TraceInformation($"Printer removed: {printerName}");
                     }
-                } catch (Exception ex) {
-                    Trace.TraceInformation($"Failed to remove printer {printerName}: {ex.Message}");
                 }
+            } catch (Exception ex) {
+                Trace.TraceInformation($"Failed to remove printer {printerName}: {ex.Message}");
             }
+        }
         #endregion
+
+    }
+
+    public class WindowData {
+        public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.GetEnvironmentVariable("CLIENTNAME");
+        private string _TB_Filter;
+        public string TB_Filter {
+            get => _TB_Filter;
+            set {
+                _TB_Filter = value;
+            }
+        }
+
+        public void HandleButtonClick(string name, MainWindow window) {
+            switch (name) {
+                case "butt_reset": window.LoadPrinters(); break;
+                case "butt_cancel": window.Close(); break;
+                case "butt_set":
+                    var s = ((DataRowView)((DataGrid)window.FindName("printers")).SelectedItem).Row[0];
+                    window.setPrinter(s.ToString());
+                    break;
+                case "butt_unset":
+                    var type = ((DataRowView)((DataGrid)window.FindName("printerType")).SelectedItem).Row[0];
+                    window.clearPrinter(type.ToString());
+                    break;
+                case "butt_ok":
+                    window.ApplyChanges();
+                    break;
+            }
+        }
+    }
+
+    public class MainWindow : System.Windows.Window {
+        private WindowData viewModel = new WindowData();
+        private DataTable printerTable = new DataTable();
+        private DataTable printerTypeTable = new DataTable();
+        private string selectedType = "";
+        Config config = new Config();
+
+        public MainWindow() {
+            DataContext = viewModel;
+
+            printerTable.Columns.Add("PrinterName");
+            printerTable.Columns.Add("Description");
+            printerTable.Columns.Add("Location");
+
+            printerTypeTable.Columns.Add("Type");
+            printerTypeTable.Columns.Add("Printer");
+            printerTypeTable.Columns.Add("Location");
+
+            LoadPrinters();
+            SetupUI();
+            this.Title = "Werkplekgebondenprinter 2.0";
+        }
+
+        public void clearPrinter(string type) {
+            DataRow[] pt = printerTypeTable.Select("Type = '" + type + "'");
+            if (pt.Length == 0) {
+                return; // printer type niet gevonden
+            }
+            pt[0][1] = "";
+            pt[0][2] = "";
+
+        }
+
+        public void setPrinter(string p) {
+            Trace.TraceInformation("Installed Printer: " + p);
+            DataRow[] p2 = printerTable.Select("PrinterName = '" + p + "'");
+            if (p2.Length == 0) {
+                return; // printer niet gevonden in ad
+            }
+                    ;
+            Trace.TraceInformation("type: " + p2[0][1]);
+            DataRow[] pt = printerTypeTable.Select("Type = '" + p2[0][1] + "'");
+            if (pt.Length == 0) {
+                return; // printer type niet gevonden
+            }
+            pt[0][1] = p;
+            pt[0][2] = p2[0][2];
+        }
+
+        public void LoadPrinters() {
+            printerTable.Clear();
+
+            foreach (var p in config.PrintersAD)
+                printerTable.Rows.Add(p.PrinterName, p.Description, p.Location);
+
+            // fill printertypes
+            var tmp = config.PrintersAD.GroupBy(x => x.Description)
+                      .Select(y => new {
+                          Type = y.Key,
+                          Printer = "",
+                          Location = "",
+                      });
+
+            printerTypeTable.Clear();
+
+            foreach (var p in tmp) {
+                printerTypeTable.Rows.Add(p.Type, p.Printer, p.Location);
+                Trace.WriteLine(p);
+            }
+
+            // computer printers
+            try {
+                foreach (string printer in config.GetInstalledWPGPrinters()) {
+                    setPrinter(printer.Split('\\').Last());
+                }
+            } catch (Win32Exception e) {
+                // printspooler waarschijk disabled, TODO: vullen met dummy
+
+            }
+        }
 
         string xaml = @"
     <Grid xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
@@ -230,147 +311,93 @@ namespace WerkplekGebondenPrinter {
     </Grid>
 ";
 
-            private void SetupUI() {
-                var reader = XmlReader.Create(new StringReader(xaml));
-                var content = (Grid)XamlReader.Load(reader);
-                this.Content = content;
-                NameScope.SetNameScope(this, NameScope.GetNameScope(content));
-                this.DataContext = viewModel;
+        private void SetupUI() {
+            var reader = XmlReader.Create(new StringReader(xaml));
+            var content = (Grid)XamlReader.Load(reader);
+            this.Content = content;
+            NameScope.SetNameScope(this, NameScope.GetNameScope(content));
+            this.DataContext = viewModel;
 
-                // write up the buttons
-                foreach (var name in new[] { "set", "unset", "ok", "reset", "cancel" }) {
-                    var btn = (Button)(this.FindName("butt_" + name));
-                    btn.Click += (s, e) => viewModel.HandleButtonClick("butt_" + name, this);
-                }
-
-                var img = (Image)this.FindName("img_voorbeeld");
-                img.Source = LoadImage("voorbeeld/kat.png");
-
-                ((TextBox)this.FindName("TB_Filter")).TextChanged += (s, e) => Refresh();
-
-                var grid = ((DataGrid)this.FindName("printerType"));
-                grid.SelectionChanged += (s, e) => {
-                    if (grid.SelectedItem is DataRowView row) {
-                        selectedType = row[0].ToString(); // FIXME: "Description"
-                        string path = "voorbeeld/" + selectedType + ".png";
-                        if (!File.Exists(path)) path = "voorbeeld/kat.png";
-                        img.Source = LoadImage(path);
-                        Refresh();
-                    }
-                };
-
-                ((DataGrid)this.FindName("printers")).ItemsSource = printerTable.DefaultView;
-                ((DataGrid)this.FindName("printerType")).ItemsSource = printerTypeTable.DefaultView;
+            // write up the buttons
+            foreach (var name in new[] { "set", "unset", "ok", "reset", "cancel" }) {
+                var btn = (Button)(this.FindName("butt_" + name));
+                btn.Click += (s, e) => viewModel.HandleButtonClick("butt_" + name, this);
             }
 
-            public void ApplyChanges() {
-                this.Cursor = System.Windows.Input.Cursors.Wait;
+            var img = (Image)this.FindName("img_voorbeeld");
+            img.Source = LoadImage("voorbeeld/kat.png");
 
-                // Get new printers from printerType DataGrid
-                var printerTypeGrid = (DataGrid)this.FindName("printerType");
-                var printersNew = printerTypeGrid.Items
-                    .Cast<dynamic>()
-                    .Where(item => !string.IsNullOrEmpty((string)item.Row[1]))
-                    .Select(item => (string)item.Row[1])
-                    .Select(item => printers.Where(x => (x.PrinterName == item)).ToArray()[0].UncName)
-                    .ToList();
+            ((TextBox)this.FindName("TB_Filter")).TextChanged += (s, e) => Refresh();
 
-                // Get old printers from printersCurrent
-                List<string> printersOld;
-
-                try {
-                    printersOld = PrinterSettings.InstalledPrinters
-                        .Cast<string>()
-                        .Where(item => printers.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
-                        .ToList();
-                } catch (Win32Exception e) {
-                    // printspooler waarschijk disabled, TODO: vullen met dummy
-                    return;
-
+            var grid = ((DataGrid)this.FindName("printerType"));
+            grid.SelectionChanged += (s, e) => {
+                if (grid.SelectedItem is DataRowView row) {
+                    selectedType = row[0].ToString(); // FIXME: "Description"
+                    string path = "voorbeeld/" + selectedType + ".png";
+                    if (!File.Exists(path)) path = "voorbeeld/kat.png";
+                    img.Source = LoadImage(path);
+                    Refresh();
                 }
+            };
 
-                Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew));
-                Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
-
-                var compare = printersNew
-                    .Union(printersOld)
-                    .Distinct()
-                    .Select(p => new {
-                        Printer = p,
-                        Side = printersNew.Contains(p) && printersOld.Contains(p) ? "==" :
-                               printersNew.Contains(p) ? "<=" :
-                               printersOld.Contains(p) ? "=>" : "?"
-                    });
-
-                foreach (var entry in compare) {
-                    var printer = entry.Printer;
-
-                    Trace.TraceInformation("printer " + entry.Printer);
-
-                    switch (entry.Side) {
-                        case "==":
-                            Trace.TraceInformation("keeping " + printer);
-                            break;
-                        case "<=":
-                            Trace.TraceInformation("printer " + printer + " toevoegen");
-                            AddPrinter(printer);
-                            Trace.TraceInformation("printer " + printer + " toegevoegd");
-                            break;
-                        case "=>":
-                            Trace.TraceInformation("weg printer " + printer);
-                            RemovePrinter(printer);
-                            Trace.TraceInformation("weggehaald printer " + printer);
-                            break;
-                        default:
-                            Trace.TraceWarning("Geen idee wat dit is " + printer);
-                            break;
-                    }
-                }
-
-                LoadPrinters();
-                this.Cursor = System.Windows.Input.Cursors.Arrow;
-
-                // Save printer list to file
-                var outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
-                var finalList = printersNew
-                    .Select(p => printers.FirstOrDefault(x => x.PrinterName == p).Location?.Replace(".intranet.local", ""))
-                    .Where(x => !string.IsNullOrEmpty(x))
-                    .OrderBy(x => x);
-
-                File.WriteAllLines(outputPath, finalList);
-
-                Trace.TraceInformation("KLAAR!");
-            }
-
-            public void Refresh() {
-                string filter = "(PrinterName LIKE '%" + viewModel.TB_Filter + "%' OR Location LIKE '%" + viewModel.TB_Filter + "%')";
-                if (!string.IsNullOrEmpty(selectedType))
-                    filter += " AND Description LIKE '" + selectedType + "'";
-                printerTable.DefaultView.RowFilter = filter;
-            }
-
-            public static BitmapImage LoadImage(string path) {
-                using (var bmp = new Bitmap(path))
-                using (var ms = new MemoryStream()) {
-                    bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    ms.Position = 0;
-                    var img = new BitmapImage();
-                    img.BeginInit();
-                    img.StreamSource = ms;
-                    img.CacheOption = BitmapCacheOption.OnLoad;
-                    img.EndInit();
-                    img.Freeze();
-                    return img;
-                }
-            }
+            ((DataGrid)this.FindName("printers")).ItemsSource = printerTable.DefaultView;
+            ((DataGrid)this.FindName("printerType")).ItemsSource = printerTypeTable.DefaultView;
         }
 
-        public class App : Application {
+        public void ApplyChanges() {
+            this.Cursor = System.Windows.Input.Cursors.Wait;
+
+            // Get new printers from printerType DataGrid
+            var printerTypeGrid = (DataGrid)this.FindName("printerType");
+            var printersNew = printerTypeGrid.Items
+                .Cast<dynamic>()
+                .Where(item => !string.IsNullOrEmpty((string)item.Row[1]))
+                .Select(item => (string)item.Row[1])
+                .Select(item => config.PrintersAD.Where(x => (x.PrinterName == item)).ToArray()[0].UncName)
+                .ToList();
+
+            // eerst config toepassen, dan pas opslaan
+            // dit voorkomt dat als er een foute printerdriver/exception is de oude situatie blijft
+            config.ApplyPrintlist(printersNew, config.GetInstalledWPGPrinters());
+            LoadPrinters();
+            config.SaveConfig(printersNew);
+            this.Cursor = System.Windows.Input.Cursors.Arrow;
+
+            Trace.TraceInformation("KLAAR!");
+        }
+
+        public void Refresh() {
+            string filter = "(PrinterName LIKE '%" + viewModel.TB_Filter + "%' OR Location LIKE '%" + viewModel.TB_Filter + "%')";
+            if (!string.IsNullOrEmpty(selectedType))
+                filter += " AND Description LIKE '" + selectedType + "'";
+            printerTable.DefaultView.RowFilter = filter;
+        }
+
+        public static BitmapImage LoadImage(string path) {
+            // het moet via een memorystream omdat het bestand anders gelocked wordt door xaml
+            // gewoon direct toekennen zou een stuk makkelijker zijn
+            using (var bmp = new Bitmap(path))
+            using (var ms = new MemoryStream()) {
+                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                ms.Position = 0;
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.StreamSource = ms;
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.EndInit();
+                img.Freeze();
+                return img;
+            }
+        }
+    }
+
+    public class App : Application {
 
         [STAThread]
         public static int Main(string[] args) {
             Trace.AutoFlush = true;
-            
+            bool sync = false;
+
             Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
 
             for (int i = 0; i < args.Length; i++) {
@@ -379,22 +406,40 @@ namespace WerkplekGebondenPrinter {
                     case "--debug":
                         Trace.TraceInformation("Debug logging is AAN");
                         break;
+                    case "-s":
+                    case "--sync":
+                        Trace.TraceInformation("printers worden gesynced");
+                        sync = true;
+                        break;
+                    case "--cwd":
+                        // in ivanti taak kan je niet makkelijk de current working directory instellen
+                        Directory.SetCurrentDirectory(args[++i]);
+                        break;
                     case "-l":
                         // TODO: voorkomen dat het op 2 regels komt
                         var li = new TextWriterTraceListener(args[++i]);
                         li.TraceOutputOptions = TraceOptions.DateTime;
                         Trace.Listeners.Add(li);
                         break;
-                    case "-v":
                     default:
                         Trace.TraceError($"Unknown argument: {args[i]}");
                         return 1;
                 }
             }
 
-            var app = new App();
-            var window = new MainWindow();
-            app.Run(window);
+            try { 
+            if (sync) {
+                Config c = new Config();
+                c.ApplyConfig();
+            } else { 
+                var app = new App();
+                var window = new MainWindow();
+                app.Run(window);
+            }
+            } catch ( Exception ex ) {
+                Trace.TraceError($"Algemene fout: {ex.Message}");
+                Trace.TraceError($"stacktrace: {ex.StackTrace}");
+            }
             Trace.WriteLine("Werkplekgebonenprinter wordt afgesloten");
             return 0;
         }
