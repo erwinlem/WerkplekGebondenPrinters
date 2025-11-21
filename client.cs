@@ -29,8 +29,18 @@ namespace WerkplekGebondenPrinter {
         public string UncName;
     }
 
+    // interface voor het laden van de printer/werkplek mapping & overige opties
+    // interface is nodig vanwege de verschillende backends (files/db/etc)
+    public interface IConfigLoader {
+        string Werkplek { get; set; }
+        List<string> Printers { get; set; }
+        void LoadPrinters();
+        void SavePrinters();
+    }
+
     public class Config {
         private const string FilterRegex = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$";
+        IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
         private List<PrinterInfo> printersAD;
         public List<PrinterInfo> PrintersAD {
             get {
@@ -38,7 +48,6 @@ namespace WerkplekGebondenPrinter {
                     printersAD = this.GetPrintersAD();
                 }
                 return printersAD;
-
             }
         }
 
@@ -88,25 +97,13 @@ namespace WerkplekGebondenPrinter {
         }
 
         public void SaveConfig(List<string> printersNew) {
-            // Save printer list to file
-            var outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
-            File.WriteAllLines(outputPath, printersNew);
-        }
-
-        public List<string> LoadConfig() {
-            var filename = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
-            try {
-                return new List<string>(File.ReadAllLines(filename));
-            } catch (Exception e) {
-                Trace.TraceError($"error reading file {filename}");
-                Trace.TraceError($"exception {e}");
-                return new List<string>();
-            }
-
+            werkplekPrinter.Printers = printersNew;
+            werkplekPrinter.SavePrinters();
         }
 
         public void ApplyConfig() {
-            ApplyPrintlist(LoadConfig(), GetInstalledWPGPrinters());
+            werkplekPrinter.LoadPrinters();
+            ApplyPrintlist(werkplekPrinter.Printers, GetInstalledWPGPrinters());
         }
 
         public void ApplyPrintlist(List<string> printersNew, List<string> printersOld) {

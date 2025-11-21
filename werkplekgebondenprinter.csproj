@@ -36,6 +36,7 @@
     <StartupObject>WerkplekGebondenPrinter.App</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ConfigLoaderBestand.cs" />
     <Compile Include="client.cs" />
   </ItemGroup>
   <ItemGroup>
