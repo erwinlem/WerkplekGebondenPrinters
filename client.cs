@@ -38,60 +38,36 @@ namespace WerkplekGebondenPrinter {
         void SavePrinters();
     }
 
+    // haal een lijst op van alle mogelijke printers
+    public interface IPrinterLoader {
+        List<PrinterInfo> LoadPrinters();
+    }
+
     public class Config {
-        private const string FilterRegex = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$";
-        IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
-        private List<PrinterInfo> printersAD;
-        public List<PrinterInfo> PrintersAD {
+        public static Config config = new Config();
+        public static string FilterRegex = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$";
+        public IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
+        public IPrinterLoader printerLoader = new PrinterLoaderDummy();
+
+        private List<PrinterInfo> printers;
+        public List<PrinterInfo> Printers {
             get {
-                if (printersAD == null) {
-                    printersAD = this.GetPrintersAD();
+                if (printers == null) {
+                    printers = printerLoader.LoadPrinters();
                 }
-                return printersAD;
+                return printers;
             }
-        }
-
-        public List<PrinterInfo> GetPrintersAD() {
-            var printers = new List<PrinterInfo>();
-            using (var searcher = new DirectorySearcher("(objectCategory=printQueue)")) {
-                searcher.PropertiesToLoad.Add("printername");
-                searcher.PropertiesToLoad.Add("description");
-                searcher.PropertiesToLoad.Add("location");
-                searcher.PropertiesToLoad.Add("UncName");
-
-
-                foreach (SearchResult result in searcher.FindAll()) {
-                    var desc = "";
-                    if (result.Properties.Contains("description")) {
-                        desc = result.Properties["description"]?[0]?.ToString();
-                    }
-                    if (Regex.IsMatch(desc, FilterRegex, RegexOptions.IgnoreCase)) {
-                        var Location = "";
-                        if (result.Properties.Contains("location")) {
-                            Location = result.Properties["location"]?[0]?.ToString();
-                        }
-
-                        printers.Add(new PrinterInfo {
-                            PrinterName = result.Properties["printername"]?[0]?.ToString(),
-                            Description = desc,
-                            Location = Location,
-                            UncName = result.Properties["UncName"]?[0]?.ToString()
-                        });
-                    }
-                }
-            }
-            return printers;
         }
 
         public List<string> GetInstalledWPGPrinters() {
             try {
                 return PrinterSettings.InstalledPrinters
                     .Cast<string>()
-                    .Where(item => PrintersAD.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
+                    .Where(item => Printers.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
                     .ToList();
             } catch (Win32Exception e) {
-                // printspooler waarschijk disabled, TODO: vullen met dummy
-                return null;
+                Trace.TraceError("fout printers ophalen, spooler disabled?");
+                return new List<string> { "error" } ;
 
             }
         }
@@ -213,7 +189,6 @@ namespace WerkplekGebondenPrinter {
         private DataTable printerTable = new DataTable();
         private DataTable printerTypeTable = new DataTable();
         private string selectedType = "";
-        Config config = new Config();
 
         public MainWindow() {
             DataContext = viewModel;
@@ -260,11 +235,11 @@ namespace WerkplekGebondenPrinter {
         public void LoadPrinters() {
             printerTable.Clear();
 
-            foreach (var p in config.PrintersAD)
+            foreach (var p in Config.config.Printers)
                 printerTable.Rows.Add(p.PrinterName, p.Description, p.Location);
 
             // fill printertypes
-            var tmp = config.PrintersAD.GroupBy(x => x.Description)
+            var tmp = Config.config.Printers.GroupBy(x => x.Description)
                       .Select(y => new {
                           Type = y.Key,
                           Printer = "",
@@ -280,7 +255,7 @@ namespace WerkplekGebondenPrinter {
 
             // computer printers
             try {
-                foreach (string printer in config.GetInstalledWPGPrinters()) {
+                foreach (string printer in Config.config.GetInstalledWPGPrinters()) {
                     setPrinter(printer.Split('\\').Last());
                 }
             } catch (Win32Exception e) {
@@ -350,14 +325,14 @@ namespace WerkplekGebondenPrinter {
                 .Cast<dynamic>()
                 .Where(item => !string.IsNullOrEmpty((string)item.Row[1]))
                 .Select(item => (string)item.Row[1])
-                .Select(item => config.PrintersAD.Where(x => (x.PrinterName == item)).ToArray()[0].UncName)
+                .Select(item => Config.config.Printers.Where(x => (x.PrinterName == item)).ToArray()[0].UncName)
                 .ToList();
 
             // eerst config toepassen, dan pas opslaan
             // dit voorkomt dat als er een foute printerdriver/exception is de oude situatie blijft
-            config.ApplyPrintlist(printersNew, config.GetInstalledWPGPrinters());
+            Config.config.ApplyPrintlist(printersNew, Config.config.GetInstalledWPGPrinters());
             LoadPrinters();
-            config.SaveConfig(printersNew);
+            Config.config.SaveConfig(printersNew);
             this.Cursor = System.Windows.Input.Cursors.Arrow;
 
             Trace.TraceInformation("KLAAR!");
@@ -399,6 +374,19 @@ namespace WerkplekGebondenPrinter {
 
             for (int i = 0; i < args.Length; i++) {
                 switch (args[i]) {
+                    case "--PrinterLoader":
+                        switch (args[++i]) {
+                            case "PrinterLoaderAD":
+                                Config.config.printerLoader = new PrinterLoaderAD();
+                                break;
+                            case "PrinterLoaderDummy":
+                                Config.config.printerLoader = new PrinterLoaderDummy();
+                                break;
+                            default:
+                                Trace.TraceError($"onbekende loader: {args[i]}");
+                                return 1;
+                        }
+                        break;
                     case "-d":
                     case "--debug":
                         Trace.TraceInformation("Debug logging is AAN");
@@ -425,14 +413,13 @@ namespace WerkplekGebondenPrinter {
             }
 
             try { 
-            if (sync) {
-                Config c = new Config();
-                c.ApplyConfig();
-            } else { 
-                var app = new App();
-                var window = new MainWindow();
-                app.Run(window);
-            }
+                if (sync) {
+                    Config.config.ApplyConfig();
+                } else { 
+                    var app = new App();
+                    var window = new MainWindow();
+                    app.Run(window);
+                }
             } catch ( Exception ex ) {
                 Trace.TraceError($"Algemene fout: {ex.Message}");
                 Trace.TraceError($"stacktrace: {ex.StackTrace}");

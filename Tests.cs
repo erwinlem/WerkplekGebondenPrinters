@@ -36,7 +36,7 @@ namespace WerkplekGebondenPrinter {
         [TestMethod]
         public void Test_AD() {
             Config c = new Config();
-            Assert.AreNotEqual(0, c.GetPrintersAD().Count);
+            Assert.AreNotEqual(0, c.Printers.Count);
         }
     }
 }
