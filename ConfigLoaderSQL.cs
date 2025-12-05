@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 
 namespace WerkplekGebondenPrinter {
 
@@ -37,7 +38,38 @@ create table WerkplekPrinters (
         }
 
         public void SavePrinters() {
-            throw new NotImplementedException();
+            // todo: upsert? anders gaan die id-tjes ook zo hard.
+            using (SqlConnection connection = new SqlConnection(connectionString)) {
+
+                connection.Open();
+                SqlTransaction transaction = connection.BeginTransaction();
+                try {
+                    // haal oude weg
+                    using (SqlCommand cmd = new SqlCommand(
+                        "delete from WerkplekPrinters where werkplek = @werkplek", connection, transaction)) {
+                        cmd.Parameters.AddWithValue("@werkplek", System.Environment.MachineName);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // stop nieuwe erin
+                    foreach (var p in printers) {
+                        using (SqlCommand cmd = new SqlCommand(
+                            "insert into WerkplekPrinters(werkplek, printer) values (@werkplek, @printer) ", connection, transaction)) {
+                            cmd.Parameters.AddWithValue("@werkplek", System.Environment.MachineName);
+                            cmd.Parameters.AddWithValue("@printer", p);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // Commit if all succeed
+                    transaction.Commit();
+                    Trace.TraceInformation("Transaction committed successfully.");
+                } catch (Exception ex) {
+                    // Rollback if any fail
+                    transaction.Rollback();
+                    Trace.TraceError("Transaction rolled back due to error: " + ex.Message);
+                }
+            }
         }
     }
 }

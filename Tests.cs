@@ -24,6 +24,16 @@ namespace WerkplekGebondenPrinter {
         }
 
         [TestMethod]
+        public void Test_ConfigLoaderSQL_Save() {
+            IConfigLoader cl = new ConfigLoaderSQL();
+            cl.LoadPrinters();
+            cl.Printers.Clear();
+            cl.Printers.Add("\\\\printer\\testprinter-static");
+            cl.Printers.Add("\\\\printer\\testprinter-"+(new DateTime()).ToString("yyyy-MM-dd-h-mm-tt"));
+            cl.SavePrinters();
+        }
+
+        [TestMethod]
         public void Test_AD() {
             Config c = new Config();
             Assert.AreNotEqual(0, c.GetPrintersAD().Count);
