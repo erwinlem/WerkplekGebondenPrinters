@@ -23,7 +23,7 @@ namespace WerkplekGebondenPrinter {
                         desc = result.Properties["description"]?[0]?.ToString();
                     }
                     // TODO: Config direct aanspreken is niet zo netjes
-                    if (Regex.IsMatch(desc, Config.FilterRegex, RegexOptions.IgnoreCase)) {
+                    if (Regex.IsMatch(desc, Config.CommentFilter, RegexOptions.IgnoreCase)) {
                         var Location = "";
                         if (result.Properties.Contains("location")) {
                             Location = result.Properties["location"]?[0]?.ToString();

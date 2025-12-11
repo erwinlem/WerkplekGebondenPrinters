@@ -45,7 +45,7 @@ namespace WerkplekGebondenPrinter {
 
     public class Config {
         public static Config config = new Config();
-        public static string FilterRegex = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK)$";
+        public static string CommentFilter = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK|ETK-PAPO)$";
         public IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
         public IPrinterLoader printerLoader = new PrinterLoaderDummy();
 
@@ -244,7 +244,8 @@ namespace WerkplekGebondenPrinter {
                           Type = y.Key,
                           Printer = "",
                           Location = "",
-                      });
+                      })
+                      .OrderBy(x => x.Type);
 
             printerTypeTable.Clear();
 
@@ -387,6 +388,10 @@ namespace WerkplekGebondenPrinter {
                                 return 1;
                         }
                         break;
+                    case "--CommentFilter":
+                        Config.CommentFilter = args[++i];
+                        break;
+   
                     case "-d":
                     case "--debug":
                         Trace.TraceInformation("Debug logging is AAN");
