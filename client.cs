@@ -12,6 +12,7 @@ using System.Management;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Forms;
 using System.Windows.Markup;
 using System.Windows.Media.Imaging;
 using System.Xml;
@@ -120,6 +121,23 @@ namespace WerkplekGebondenPrinter {
                         break;
                 }
             }
+
+            // notificatie popup
+            string message = string.Join("\n",
+                    compare.Where(item => item.Side != "==")
+                        .Select(p => (p.Side == "=>" ? "❌" : "✅") + (p.Printer.Split('\\').Last()))
+                    );
+            if (message == "") {
+                // geen aanpassing, dus geen popup nodig
+                return;
+            }
+            NotifyIcon notifyIcon1 = new NotifyIcon();
+            notifyIcon1.Visible = true;
+            notifyIcon1.Icon = SystemIcons.Information;
+            notifyIcon1.BalloonTipTitle = "Printers zijn aangepast";
+            notifyIcon1.BalloonTipText = message;
+            notifyIcon1.BalloonTipIcon = ToolTipIcon.None;
+            notifyIcon1.ShowBalloonTip(5000);
         }
 
         #region add/remove printer
