@@ -19,6 +19,14 @@ directory.  Als opslag worden files gebruikt met de hostname.
 
 Powershell is echt te traag bij het opstarten, omgezet naar c#.
 
+## Hoe ziet het eruit?
+
+![Screenshot van hoofdscherm](screenshot.png)
+
+ 1. Huidige printers
+ 1. Mogelijke printers
+ 1. Voorbeeld van het type printer
+
 # Verbeterpunten
 
 * Script maken wat aangeroepen kan worden als er gewisseld wordt van werkplek.
