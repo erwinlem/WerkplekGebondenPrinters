@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
+using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media.Imaging;
 using System.Xml;
@@ -62,9 +63,15 @@ namespace WerkplekGebondenPrinter {
 
         public List<string> GetInstalledWPGPrinters() {
             try {
+                Trace.TraceInformation(String.Join("\n",
+                        PrinterSettings.InstalledPrinters.Cast<string>()
+                    .Select(item => Regex.Replace(item, @"^\\\\([^\.]*)\\", @"\\$1." + System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName + "\\"))
+                    ));
                 return PrinterSettings.InstalledPrinters
                     .Cast<string>()
-                    .Where(item => Printers.Where(x => (x.UncName == item)).ToList().Count != 0) // filter niet gepubliceerde printers
+                    // Zorg ervoor dat er altijd een FQDN wordt gebruikt bij het vergelijken, zo komen ze ook uit het ad rollen.
+                    // \\printserver1\print1 wordt dan \\printserver1.domein.local\print1
+                    .Where(item => Printers.Where(x => (x.UncName.Equals(Regex.Replace(item, @"\\\\([^\.]*)\\", @"\\$1." + System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName + "\\"),StringComparison.OrdinalIgnoreCase))).ToList().Count != 0) // filter niet gepubliceerde printers
                     .ToList();
             } catch (Win32Exception e) {
                 Trace.TraceError("fout printers ophalen, spooler disabled?");
@@ -88,13 +95,13 @@ namespace WerkplekGebondenPrinter {
             Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
 
             var compare = printersNew
-                .Union(printersOld)
-                .Distinct()
+                .Union(printersOld, StringComparer.OrdinalIgnoreCase)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(p => new {
                     Printer = p,
-                    Side = printersNew.Contains(p) && printersOld.Contains(p) ? "==" :
-                           printersNew.Contains(p) ? "<=" :
-                           printersOld.Contains(p) ? "=>" : "?"
+                    Side = printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) && printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "==" :
+                           printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) ? "<=" :
+                           printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "=>" : "?"
                 });
 
             foreach (var entry in compare) {
@@ -185,7 +192,9 @@ namespace WerkplekGebondenPrinter {
 
         public void HandleButtonClick(string name, MainWindow window) {
             switch (name) {
-                case "butt_reset": window.LoadPrinters(); break;
+                case "butt_reset":
+                    window.LoadPrinters();
+                    break;
                 case "butt_cancel": window.Close(); break;
                 case "butt_set":
                     var s = ((DataRowView)((DataGrid)window.FindName("printers")).SelectedItem).Row[0];
@@ -435,7 +444,7 @@ namespace WerkplekGebondenPrinter {
                 }
             }
 
-            try { 
+            try {
                 if (sync) {
                     Config.config.ApplyConfig();
                 } else { 

@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <Company>HagaZiekenhuis</Company>
+    <Copyright>Copyright © $(Company) 2025-$([System.DateTime]::Now.Year)</Copyright>
+    <Version>0.0.1</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <InformationalVersion>$(Version)-$([System.DateTime]::Now.ToString("u"))</InformationalVersion>
+  </PropertyGroup>
+</Project>

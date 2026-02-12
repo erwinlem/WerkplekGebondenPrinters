@@ -10,6 +10,7 @@ hierdoor direct de juiste printer gebruiken voor een bepaald etiket.
 * Zo simpel mogelijk.
 * Generiek.
 * Makkelijk te onderhouden.
+* [Semantic Versioning](https://semver.org/)
 
 # Implementatie
 
@@ -17,14 +18,6 @@ Het geheel is gebouwd in powershell, printers worden uitgelezen uit active
 directory.  Als opslag worden files gebruikt met de hostname.
 
 Powershell is echt te traag bij het opstarten, omgezet naar c#.
-
-## Hoe ziet het eruit?
-
-![Screenshot van hoofdscherm](screenshot.png)
-
- 1. Huidige printers
- 2. Mogelijke printers
- 3. Voorbeeld van het type printer
 
 # Verbeterpunten
 
@@ -36,6 +29,12 @@ Powershell is echt te traag bij het opstarten, omgezet naar c#.
 * Details over printer bij selecteren (printserver/sticker type etc).
 * Server naam meenemen zodat dezelfde printernamen gebruikt kunnen worden.
 
-# Commandline opties
-
 # Tips
+
+## Opstarten
+
+Standaard kan je get direct starten met `WerkplekGebondenPrinter.exe`
+Je kan kiezen om andere loaders te gebruiken zoals active directory of sql :
+`
+WerkplekGebondenPrinter-0.1.0.exe -d  -l h:\wpg-client.txt --cwd u:\Werkplekgebondenprinter2 --PrinterLoader PrinterLoaderAD
+`
