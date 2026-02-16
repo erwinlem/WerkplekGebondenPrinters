@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
@@ -8,6 +8,7 @@
     <RootNamespace>WerkplekGebondenPrinter</RootNamespace>
     <StartupObject>WerkplekGebondenPrinter.App</StartupObject>
     <Deterministic>true</Deterministic>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
