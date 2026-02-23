@@ -97,19 +97,23 @@ namespace WerkplekGebondenPrinter {
         }
 
         public IEnumerable<(string Printer, string Side)> DiffPrinters(List<string> printersNew, List<string> printersOld) {
-            Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew));
-            Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
 
-            return printersNew
-                .Union(printersOld, StringComparer.OrdinalIgnoreCase)
+            Regex StripDomainRegex = new Regex(@"\.[^\\]+", RegexOptions.Compiled);
+            var printersNew2 = printersNew.Select(p => StripDomainRegex.Replace(p, "")); // todo: optioneel vervangen met domeinnaam
+            var printersOld2 = printersOld.Select(p => StripDomainRegex.Replace(p, ""));
+
+            Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew2));
+            Trace.TraceInformation("oude printers : " + string.Join(",", printersOld2));
+            return printersNew2
+                .Union(printersOld2, StringComparer.OrdinalIgnoreCase)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(p => (
                     Printer: p,
                     Side:
-                        printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) &&
-                        printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "==" :
-                        printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) ? "<=" :
-                        printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "=>" : "?"
+                        printersNew2.Contains(p, StringComparer.OrdinalIgnoreCase) &&
+                        printersOld2.Contains(p, StringComparer.OrdinalIgnoreCase) ? "==" :
+                        printersNew2.Contains(p, StringComparer.OrdinalIgnoreCase) ? "<=" :
+                        printersOld2.Contains(p, StringComparer.OrdinalIgnoreCase) ? "=>" : "?"
                 ));
 
         }

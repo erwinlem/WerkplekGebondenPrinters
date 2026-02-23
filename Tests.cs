@@ -54,5 +54,16 @@ namespace WerkplekGebondenPrinter {
                 Trace.WriteLine("printer:" + p);
             }
         }
+        [TestMethod]
+        public void Test_RemoveDomein() {
+            Config c = new Config();
+            var pd = c.DiffPrinters(
+                    new System.Collections.Generic.List<string>() { @"\\print01.domein\a", @"\\print01.domein\b" },
+                    new System.Collections.Generic.List<string>() { @"\\print01\b", @"\\print01\c" }
+                );
+            foreach (var p in pd) {
+                Trace.WriteLine("printer:" + p);
+            }
+        }
     }
 }
