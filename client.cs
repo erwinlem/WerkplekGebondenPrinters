@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
@@ -22,6 +23,7 @@ using Image = System.Windows.Controls.Image;
 using TextBox = System.Windows.Controls.TextBox;
 
 namespace WerkplekGebondenPrinter {
+    
     public struct PrinterInfo {
         public string PrinterName;
         public string Description;
@@ -44,8 +46,14 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class Config {
+
+        public static  Dictionary<string, string> Settings = new Dictionary<string, string> {
+            // standaard waarden
+            { "CommentFilter", "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK|ETK-PAPO)$" },
+            { "ConfigLoaderSQL.connectionString", "Server=SQLSERVER;Database=DATABASE;Trusted_Connection=True;" }
+        };
+
         public static Config config = new Config();
-        public static string CommentFilter = "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK|ETK-PAPO)$";
         public IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
         public IPrinterLoader printerLoader = new PrinterLoaderDummy();
 
@@ -390,14 +398,14 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class App : Application {
+        static bool sync = false;
+        // Dit is om de commandline arguments te verwerken bij het runnen van de exe
+        // Of de app.config voor als je de test runner draait.
 
-        [STAThread]
-        public static int Main(string[] args) {
-            Trace.AutoFlush = true;
-            bool sync = false;
-
-            Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
-
+        public static void ParseArguments(NameValueCollection args) {
+            ParseArguments(args.AllKeys.SelectMany(k => new[] { k, args[k] }).ToArray());
+        }
+        public static void ParseArguments(string[] args) {
             for (int i = 0; i < args.Length; i++) {
                 switch (args[i]) {
                     case "--PrinterLoader":
@@ -410,13 +418,15 @@ namespace WerkplekGebondenPrinter {
                                 break;
                             default:
                                 Trace.TraceError($"onbekende loader: {args[i]}");
-                                return 1;
+                                break;
                         }
                         break;
                     case "--CommentFilter":
-                        Config.CommentFilter = args[++i];
+                        Config.Settings["CommentFilter"] = args[++i];
                         break;
-   
+                    case "--ConfigLoaderSQL.connectionString":
+                        Config.Settings["ConfigLoaderSQL.connectionString"] = args[++i];
+                        break;
                     case "-d":
                     case "--debug":
                         Trace.TraceInformation("Debug logging is AAN");
@@ -438,10 +448,19 @@ namespace WerkplekGebondenPrinter {
                         break;
                     default:
                         Trace.TraceError($"Unknown argument: {args[i]}");
-                        return 1;
+                        break;
                 }
             }
+        }
 
+        [STAThread]
+        public static int Main(string[] args) {
+            Trace.AutoFlush = true;
+            
+
+            Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
+
+            ParseArguments(args);
             try {
                 if (sync) {
                     Config.config.ApplyConfig();

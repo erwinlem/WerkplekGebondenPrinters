@@ -1,6 +1,8 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Configuration;
 using System.Diagnostics;
+using System.Linq;
 
 namespace WerkplekGebondenPrinter {
     [TestClass]
@@ -16,6 +18,7 @@ namespace WerkplekGebondenPrinter {
 
         [TestMethod]
         public void Test_ConfigLoaderSQL_load() {
+            App.ParseArguments(ConfigurationManager.AppSettings);
             IConfigLoader cl = new ConfigLoaderSQL();
             cl.LoadPrinters();
             foreach (string s in cl.Printers) {
@@ -25,6 +28,7 @@ namespace WerkplekGebondenPrinter {
 
         [TestMethod]
         public void Test_ConfigLoaderSQL_Save() {
+            App.ParseArguments(ConfigurationManager.AppSettings);
             IConfigLoader cl = new ConfigLoaderSQL();
             cl.LoadPrinters();
             cl.Printers.Clear();

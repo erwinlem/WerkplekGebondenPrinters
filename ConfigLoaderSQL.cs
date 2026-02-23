@@ -18,7 +18,6 @@ create table WerkplekPrinters (
 */
 
     public class ConfigLoaderSQL : IConfigLoader {
-        string connectionString = "Server=SQLSERVER;Database=DATABASE;Trusted_Connection=True;";
         string werkplek;
         public string Werkplek { get => werkplek; set => werkplek = value; }
         List<string> printers = new List<string>();
@@ -26,7 +25,7 @@ create table WerkplekPrinters (
 
         public void LoadPrinters() {
             DataSet dataset = new DataSet();
-            using (SqlConnection connection = new SqlConnection(connectionString)) {
+            using (SqlConnection connection = new SqlConnection(Config.Settings["ConfigLoaderSQL.connectionString"])) {
                 SqlDataAdapter adapter = new SqlDataAdapter();
 #warning sql inject
                 adapter.SelectCommand = new SqlCommand("select printer from WerkplekPrinters where werkplek = '"+System.Environment.MachineName+"'", connection);
@@ -39,7 +38,7 @@ create table WerkplekPrinters (
 
         public void SavePrinters() {
             // todo: upsert? anders gaan die id-tjes ook zo hard.
-            using (SqlConnection connection = new SqlConnection(connectionString)) {
+            using (SqlConnection connection = new SqlConnection(Config.Settings["ConfigLoaderSQL.connectionString"])) {
 
                 connection.Open();
                 SqlTransaction transaction = connection.BeginTransaction();

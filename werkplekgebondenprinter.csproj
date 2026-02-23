@@ -8,6 +8,7 @@
     <RootNamespace>WerkplekGebondenPrinter</RootNamespace>
     <StartupObject>WerkplekGebondenPrinter.App</StartupObject>
     <Deterministic>true</Deterministic>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
