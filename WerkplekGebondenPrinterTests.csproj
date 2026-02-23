@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <RootNamespace>WerkplekGebondenPrinterTests</RootNamespace>
     <AssemblyName>WerkplekGebondenPrinterTests</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
-    <!-- Optional: keep your custom output path -->
     <OutputPath>bin\Tests\</OutputPath>
   </PropertyGroup>
 
@@ -17,20 +17,17 @@
   <ItemGroup>
     <Reference Include="System.DirectoryServices" />
     <Reference Include="System.Management" />
-
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
-    <PackageReference Include="MSTest.Analyzers" Version="4.1.0" PrivateAssets="all" />
-    <PackageReference Include="MSTest.TestAdapter" Version="4.1.0" />
-    <PackageReference Include="MSTest.TestFramework" Version="4.1.0" />
-
-    <!-- Updated to avoid downgrade warnings -->
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
-    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="**/*.cs" />
     <Compile Include="tests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.11.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.11.1" />
   </ItemGroup>
 
 </Project>
