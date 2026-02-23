@@ -42,5 +42,17 @@ namespace WerkplekGebondenPrinter {
             Config c = new Config();
             Assert.AreNotEqual(0, c.Printers.Count);
         }
+
+        [TestMethod]
+        public void Test_Remove() {
+            Config c = new Config();
+            var pd = c.DiffPrinters(
+                    new System.Collections.Generic.List<string>() { @"\\print01\a", @"\\print01\b" },
+                    new System.Collections.Generic.List<string>() { @"\\print01\b", @"\\print01\c" }
+                );
+            foreach (var p in pd) {
+                Trace.WriteLine("printer:" + p);
+            }
+        }
     }
 }

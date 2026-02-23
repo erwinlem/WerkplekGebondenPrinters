@@ -96,20 +96,26 @@ namespace WerkplekGebondenPrinter {
             ApplyPrintlist(werkplekPrinter.Printers, GetInstalledWPGPrinters());
         }
 
-        public void ApplyPrintlist(List<string> printersNew, List<string> printersOld) {
+        public IEnumerable<(string Printer, string Side)> DiffPrinters(List<string> printersNew, List<string> printersOld) {
             Trace.TraceInformation("nieuwe printers : " + string.Join(",", printersNew));
             Trace.TraceInformation("oude printers : " + string.Join(",", printersOld));
 
-            var compare = printersNew
+            return printersNew
                 .Union(printersOld, StringComparer.OrdinalIgnoreCase)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(p => new {
-                    Printer = p,
-                    Side = printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) && printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "==" :
-                           printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) ? "<=" :
-                           printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "=>" : "?"
-                });
+                .Select(p => (
+                    Printer: p,
+                    Side:
+                        printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) &&
+                        printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "==" :
+                        printersNew.Contains(p, StringComparer.OrdinalIgnoreCase) ? "<=" :
+                        printersOld.Contains(p, StringComparer.OrdinalIgnoreCase) ? "=>" : "?"
+                ));
 
+        }
+
+        public void ApplyPrintlist(List<string> printersNew, List<string> printersOld) {
+            var compare = DiffPrinters(printersNew, printersOld);
             foreach (var entry in compare) {
                 var printer = entry.Printer;
 
