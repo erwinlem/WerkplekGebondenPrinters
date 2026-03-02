@@ -18,12 +18,13 @@ using System.Windows.Media.Imaging;
 using System.Xml;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
+using Control = System.Windows.Controls.Control;
 using DataGrid = System.Windows.Controls.DataGrid;
 using Image = System.Windows.Controls.Image;
 using TextBox = System.Windows.Controls.TextBox;
 
 namespace WerkplekGebondenPrinter {
-    
+
     public struct PrinterInfo {
         public string PrinterName;
         public string Description;
@@ -47,7 +48,7 @@ namespace WerkplekGebondenPrinter {
 
     public class Config {
 
-        public static  Dictionary<string, string> Settings = new Dictionary<string, string> {
+        public static Dictionary<string, string> Settings = new Dictionary<string, string> {
             // standaard waarden
             { "CommentFilter", "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK|ETK-PAPO)$" },
             { "ConfigLoaderSQL.connectionString", "Server=SQLSERVER;Database=DATABASE;Trusted_Connection=True;" }
@@ -77,11 +78,11 @@ namespace WerkplekGebondenPrinter {
                     .Cast<string>()
                     // Zorg ervoor dat er altijd een FQDN wordt gebruikt bij het vergelijken, zo komen ze ook uit het ad rollen.
                     // \\printserver1\print1 wordt dan \\printserver1.domein.local\print1
-                    .Where(item => Printers.Where(x => (x.UncName.Equals(Regex.Replace(item, @"\\\\([^\.]*)\\", @"\\$1." + System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName + "\\"),StringComparison.OrdinalIgnoreCase))).ToList().Count != 0) // filter niet gepubliceerde printers
+                    .Where(item => Printers.Where(x => (x.UncName.Equals(Regex.Replace(item, @"\\\\([^\.]*)\\", @"\\$1." + System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName + "\\"), StringComparison.OrdinalIgnoreCase))).ToList().Count != 0) // filter niet gepubliceerde printers
                     .ToList();
             } catch (Win32Exception e) {
                 Trace.TraceError("fout printers ophalen, spooler disabled?");
-                return new List<string> { "error" } ;
+                return new List<string> { "error" };
 
             }
         }
@@ -234,6 +235,23 @@ namespace WerkplekGebondenPrinter {
         private string selectedType = "";
 
         public MainWindow() {
+            // standaard marge voor alle elementen
+            // Buttons, TextBox, DataGrid, etc.
+            // todo: dit kan vast slimmer
+            var styleTargets = new (Type type, DependencyProperty property)[] {
+                (typeof(Control), Control.MarginProperty),
+                (typeof(Button), Button.MarginProperty),
+                (typeof(Grid), Grid.MarginProperty),
+                (typeof(Image), Image.MarginProperty),
+                (typeof(TextBlock), TextBlock.MarginProperty)
+            };
+
+            foreach (var (type, dp) in styleTargets) {
+                var style = new Style(type);
+                style.Setters.Add(new Setter(dp, new Thickness(10)));
+                this.Resources.Add(type, style);
+            }
+
             DataContext = viewModel;
 
             printerTable.Columns.Add("PrinterName");
@@ -309,22 +327,30 @@ namespace WerkplekGebondenPrinter {
         }
 
         string xaml = @"
-    <Grid xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
-      xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{DynamicResource Theme_BackgroundBrush}'>
-        <TextBlock Name='TB_Werkplek' Text='{Binding TB_Werkplek}' FontSize='20' Margin='8,8,0,8' HorizontalAlignment='Left' VerticalAlignment='Top' Height='32' Width='624' />
-        <TextBlock Text='Filter:' FontSize='14' Margin='648,16,0,0' HorizontalAlignment='Left' VerticalAlignment='Top' Height='24' />
-        <TextBox Name='TB_Filter' Text='{Binding TB_Filter, UpdateSourceTrigger=PropertyChanged}' Margin='720,8,4,8' FontSize='24' VerticalAlignment='Top' Height='32' IsEnabled='True' />
-        <Button Name='butt_set' Content='← GEBRUIK' Width='70' Height='40' Margin='640,108,4,4' VerticalAlignment='Top' HorizontalAlignment='Left' />
-        <Button Name='butt_reset' Content='↺ Herstel' Width='70' Height='40' Margin='640,156,4,4' VerticalAlignment='Top' HorizontalAlignment='Left' />
-        <Button Name='butt_unset' Content='❌ Verwijder' Width='70' Height='40' Margin='640,206,4,4' VerticalAlignment='Top' HorizontalAlignment='Left' />
-        <DataGrid Name='printerType' Margin='8,48,0,328' HorizontalAlignment='Left' Width='624' IsReadOnly='True' SelectionMode='Single' CanUserSortColumns='True' />
-        <DataGrid Name='printers' Margin='720,48,8,48' IsReadOnly='True' SelectionMode='Single' />
-        <StackPanel Orientation='Horizontal' HorizontalAlignment='Right' VerticalAlignment='Bottom' Margin='4,4,4,4'>
-            <Button Name='butt_cancel' Content='Annuleren' Width='100' Margin='4,4,4,4' />
-            <Button Name='butt_ok' Content='Toepassen' Margin='4,4,4,4' Width='100' />
+        <Grid xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+  xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{DynamicResource Theme_BackgroundBrush}'>
+        <Grid.ColumnDefinitions><ColumnDefinition  Width='*' SharedSizeGroup='A'/><ColumnDefinition  Width='100' SharedSizeGroup='A'/><ColumnDefinition  Width='*' SharedSizeGroup='A'/></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height='Auto'/><RowDefinition Height='*'/><RowDefinition Height='*'/><RowDefinition Height='Auto'/></Grid.RowDefinitions>
+
+        <TextBlock Name='TB_Werkplek' Text='{Binding TB_Werkplek}' FontSize='20' Grid.Column='0' Grid.Row='0' />
+        <TextBlock Text='Filter:' FontSize='20' TextAlignment='Right' Grid.Column='1' Grid.Row='0' />
+        <TextBox Name='TB_Filter' Text='{Binding TB_Filter, UpdateSourceTrigger=PropertyChanged}' FontSize='24' Height='32' IsEnabled='True' Grid.Column='3' Grid.Row='0' />
+
+        <StackPanel Grid.Column='1' Grid.Row='1' Grid.RowSpan='2'>
+            <Button Name='butt_set' Content='← GEBRUIK' Height='40'  />
+            <Button Name='butt_reset' Content='↺ Herstel' Height='40'  />
+            <Button Name='butt_unset' Content='❌ Verwijder' Height='40' />
         </StackPanel>
-        <Image Name='img_voorbeeld' Margin='8,0,0,8' HorizontalAlignment='Left' VerticalAlignment='Bottom' Width='320' Height='320' />
-    </Grid>
+
+        <DataGrid Name='printerType' IsReadOnly='True' SelectionMode='Single' CanUserSortColumns='True' Grid.Column='0' Grid.Row='1' AlternatingRowBackground='WhiteSmoke' AlternationCount='2' />
+        <Image Name='img_voorbeeld' Grid.Column='0' Grid.Row='2' />
+
+        <DataGrid Name='printers' IsReadOnly='True' SelectionMode='Single' Grid.Column='2' Grid.Row='1' Grid.RowSpan='2' AlternatingRowBackground='WhiteSmoke' AlternationCount='2' />
+        <StackPanel Orientation='Horizontal' Grid.Column='0' Grid.Row='3' Grid.ColumnSpan='3' FlowDirection='RightToLeft'>
+            <Button Name='butt_cancel' Content='Annuleren' Width='100' Height='40' />
+            <Button Name='butt_ok' Content='Toepassen' Width='100' Height='40'/>
+        </StackPanel>
+</Grid>
 ";
 
         private void SetupUI() {
@@ -466,7 +492,7 @@ namespace WerkplekGebondenPrinter {
         [STAThread]
         public static int Main(string[] args) {
             Trace.AutoFlush = true;
-            
+
 
             Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
 
@@ -474,12 +500,12 @@ namespace WerkplekGebondenPrinter {
             try {
                 if (sync) {
                     Config.config.ApplyConfig();
-                } else { 
+                } else {
                     var app = new App();
                     var window = new MainWindow();
                     app.Run(window);
                 }
-            } catch ( Exception ex ) {
+            } catch (Exception ex) {
                 Trace.TraceError($"Algemene fout: {ex.Message}");
                 Trace.TraceError($"stacktrace: {ex.StackTrace}");
             }
