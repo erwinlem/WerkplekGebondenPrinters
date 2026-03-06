@@ -370,6 +370,7 @@ namespace WerkplekGebondenPrinter {
             img.Source = LoadImage("voorbeeld/onbekend.png");
 
             ((TextBox)this.FindName("TB_Filter")).TextChanged += (s, e) => Refresh();
+            ((DataGrid)this.FindName("printers")).MouseDoubleClick += (s, e) => viewModel.HandleButtonClick("butt_set", this);
 
             var grid = ((DataGrid)this.FindName("printerType"));
             grid.SelectionChanged += (s, e) => {
