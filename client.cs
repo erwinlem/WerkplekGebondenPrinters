@@ -9,6 +9,7 @@ using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +17,7 @@ using System.Windows.Forms;
 using System.Windows.Markup;
 using System.Windows.Media.Imaging;
 using System.Xml;
+using System.Xml.Linq;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
 using Control = System.Windows.Controls.Control;
@@ -51,12 +53,19 @@ namespace WerkplekGebondenPrinter {
         public static Dictionary<string, string> Settings = new Dictionary<string, string> {
             // standaard waarden
             { "CommentFilter", "^(ETK-Medicatie|ETK-LAB|ETK-RODEBALK|ETK-STAM|A4|ETK-Patient|Polsband|PolsbandB|PolsbandK|ETK-PAPO)$" },
-            { "ConfigLoaderSQL.connectionString", "Server=SQLSERVER;Database=DATABASE;Trusted_Connection=True;" }
+            { "ConfigLoaderSQL.connectionString", "Server=SQLSERVER;Database=DATABASE;Trusted_Connection=True;" },
+            { "ConfigLoader" , "ConfigLoaderBestand"},
+            { "PrinterLoader" , "PrinterLoaderDummy"}
         };
 
-        public static Config config = new Config();
-        public IConfigLoader werkplekPrinter = new ConfigLoaderBestand(); // voor nu alleen nog even bestanden
-        public IPrinterLoader printerLoader = new PrinterLoaderDummy();
+        public static Config config;
+        public IConfigLoader werkplekPrinter;
+        public IPrinterLoader printerLoader;
+
+        public Config() {
+            werkplekPrinter = (IConfigLoader)Activator.CreateInstance(Assembly.GetExecutingAssembly().GetType("WerkplekGebondenPrinter." + Settings["ConfigLoader"]));
+            printerLoader = (IPrinterLoader)Activator.CreateInstance(Assembly.GetExecutingAssembly().GetType("WerkplekGebondenPrinter." + Settings["PrinterLoader"]));
+        }
 
         private List<PrinterInfo> printers;
         public List<PrinterInfo> Printers {
@@ -366,6 +375,7 @@ namespace WerkplekGebondenPrinter {
             ((TextBox)this.FindName("TB_Filter")).TextChanged += (s, e) => Refresh();
             ((DataGrid)this.FindName("printers")).MouseDoubleClick += (s, e) => viewModel.HandleButtonClick("butt_set", this);
 
+
             var grid = ((DataGrid)this.FindName("printerType"));
             grid.SelectionChanged += (s, e) => {
                 if (grid.SelectedItem is DataRowView row) {
@@ -439,24 +449,11 @@ namespace WerkplekGebondenPrinter {
         public static void ParseArguments(string[] args) {
             for (int i = 0; i < args.Length; i++) {
                 switch (args[i]) {
-                    case "--PrinterLoader":
-                        switch (args[++i]) {
-                            case "PrinterLoaderAD":
-                                Config.config.printerLoader = new PrinterLoaderAD();
-                                break;
-                            case "PrinterLoaderDummy":
-                                Config.config.printerLoader = new PrinterLoaderDummy();
-                                break;
-                            default:
-                                Trace.TraceError($"onbekende loader: {args[i]}");
-                                break;
-                        }
-                        break;
                     case "--CommentFilter":
-                        Config.Settings["CommentFilter"] = args[++i];
-                        break;
+                    case "--PrinterLoader":
+                    case "--ConfigLoader":
                     case "--ConfigLoaderSQL.connectionString":
-                        Config.Settings["ConfigLoaderSQL.connectionString"] = args[++i];
+                        Config.Settings[args[i].Replace("--","")] = args[++i];
                         break;
                     case "-d":
                     case "--debug":
@@ -487,18 +484,16 @@ namespace WerkplekGebondenPrinter {
         [STAThread]
         public static int Main(string[] args) {
             Trace.AutoFlush = true;
-
-
             Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
 
             ParseArguments(args);
+            Config.config = new Config();
+
             try {
                 if (sync) {
                     Config.config.ApplyConfig();
                 } else {
-                    var app = new App();
-                    var window = new MainWindow();
-                    app.Run(window);
+                    (new App()).Run(new MainWindow());
                 }
             } catch (Exception ex) {
                 Trace.TraceError($"Algemene fout: {ex.Message}");
