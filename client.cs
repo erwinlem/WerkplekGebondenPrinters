@@ -199,13 +199,7 @@ namespace WerkplekGebondenPrinter {
 
     public class WindowData {
         public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.GetEnvironmentVariable("CLIENTNAME");
-        private string _TB_Filter;
-        public string TB_Filter {
-            get => _TB_Filter;
-            set {
-                _TB_Filter = value;
-            }
-        }
+        public string TB_Filter { get; set; }
 
         public void HandleButtonClick(string name, MainWindow window) {
             switch (name) {
