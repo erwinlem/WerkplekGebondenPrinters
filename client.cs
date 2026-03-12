@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -49,6 +50,17 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class Config {
+
+        public static string Hostname {
+            get {
+                // wanneer explorer al geopend is wordt clientname niet geupdate binnen die explorer.exe
+                // direct het register uitlezen is betrouwbaarder
+                // Citrix gebruikt CSWorkStationName
+                // Windows gebruikt CLIENTNAME
+                // todo: Omnissa zou ook CSWorkStationName moeten gebruiken
+                return (Registry.GetValue(@"HKEY_CURRENT_USER\Volatile Environment", "CSWorkStationName", Environment.GetEnvironmentVariable("CLIENTNAME"))).ToString();
+            }
+        }
 
         public static Dictionary<string, string> Settings = new Dictionary<string, string> {
             // standaard waarden
@@ -207,7 +219,7 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class WindowData {
-        public string TB_Werkplek { get; set; } = "Werkplek - " + Environment.GetEnvironmentVariable("CLIENTNAME");
+        public string TB_Werkplek { get; set; } = "Werkplek - " + Config.Hostname;
         public string TB_Filter { get; set; }
 
         public void HandleButtonClick(string name, MainWindow window) {
@@ -439,6 +451,18 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class App : Application {
+        class LocalSingleLineListener : TextWriterTraceListener {
+            public LocalSingleLineListener(string file) : base(file) {
+                TraceOutputOptions = TraceOptions.DateTime | TraceOptions.LogicalOperationStack;
+            }
+
+            public override void TraceEvent(TraceEventCache eventCache, string source,
+                                            TraceEventType eventType, int id, string message) {
+                message = message?.Replace("\r", " ").Replace("\n", " ");
+                base.TraceEvent(eventCache, source, eventType, id, message);
+            }
+        }
+
         static bool sync = false;
         // Dit is om de commandline arguments te verwerken bij het runnen van de exe
         // Of de app.config voor als je de test runner draait.
@@ -469,10 +493,7 @@ namespace WerkplekGebondenPrinter {
                         Directory.SetCurrentDirectory(args[++i]);
                         break;
                     case "-l":
-                        // TODO: voorkomen dat het op 2 regels komt
-                        var li = new TextWriterTraceListener(args[++i]);
-                        li.TraceOutputOptions = TraceOptions.DateTime;
-                        Trace.Listeners.Add(li);
+                        Trace.Listeners.Add(new LocalSingleLineListener(args[++i]));
                         break;
                     default:
                         Trace.TraceError($"Unknown argument: {args[i]}");

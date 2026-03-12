@@ -15,7 +15,7 @@ namespace WerkplekGebondenPrinter {
         List<string> IConfigLoader.Printers { get => printers; set => printers = value; }
 
         public void LoadPrinters() {
-            var filename = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
+            var filename = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Config.Hostname + ".txt");
             try {
                 printers = new List<string>(File.ReadAllLines(filename));
             } catch (Exception e) {
@@ -26,7 +26,7 @@ namespace WerkplekGebondenPrinter {
 
         public void SavePrinters() {
             // Save printer list to file
-            var outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Environment.GetEnvironmentVariable("CLIENTNAME") + ".txt");
+            var outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "computers", Config.Hostname + ".txt");
             File.WriteAllLines(outputPath, printers);
         }
     }

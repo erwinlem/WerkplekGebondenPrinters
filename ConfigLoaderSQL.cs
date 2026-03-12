@@ -46,7 +46,7 @@ create table WerkplekPrinters (
                     // haal oude weg
                     using (SqlCommand cmd = new SqlCommand(
                         "delete from WerkplekPrinters where werkplek = @werkplek", connection, transaction)) {
-                        cmd.Parameters.AddWithValue("@werkplek", Environment.GetEnvironmentVariable("CLIENTNAME"));
+                        cmd.Parameters.AddWithValue("@werkplek", Config.Hostname);
                         cmd.ExecuteNonQuery();
                     }
 
@@ -54,7 +54,7 @@ create table WerkplekPrinters (
                     foreach (var p in printers) {
                         using (SqlCommand cmd = new SqlCommand(
                             "insert into WerkplekPrinters(werkplek, printer) values (@werkplek, @printer) ", connection, transaction)) {
-                            cmd.Parameters.AddWithValue("@werkplek", Environment.GetEnvironmentVariable("CLIENTNAME"));
+                            cmd.Parameters.AddWithValue("@werkplek", Config.Hostname);
                             cmd.Parameters.AddWithValue("@printer", p);
                             cmd.ExecuteNonQuery();
                         }
