@@ -58,7 +58,11 @@ namespace WerkplekGebondenPrinter {
                 // Citrix gebruikt CSWorkStationName
                 // Windows gebruikt CLIENTNAME
                 // todo: Omnissa zou ook CSWorkStationName moeten gebruiken
-                return (Registry.GetValue(@"HKEY_CURRENT_USER\Volatile Environment", "CSWorkStationName", Environment.GetEnvironmentVariable("CLIENTNAME"))).ToString();
+		try {
+                    return (Registry.GetValue(@"HKEY_CURRENT_USER\Volatile Environment", "CSWorkStationName", Environment.GetEnvironmentVariable("CLIENTNAME"))).ToString();
+                } catch {
+                    return "ERROR-GETTING-HOSTNAME";
+                }
             }
         }
 
