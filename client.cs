@@ -283,7 +283,7 @@ namespace WerkplekGebondenPrinter {
 
             LoadPrinters();
             SetupUI();
-            this.Title = "Werkplekgebondenprinter 2.0";
+            this.Title = Assembly.GetEntryAssembly()?.GetName().Name.Replace('-',' ');
         }
 
         public void clearPrinter(string type) {
