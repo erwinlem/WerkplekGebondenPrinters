@@ -456,7 +456,8 @@ namespace WerkplekGebondenPrinter {
 
     public class App : Application {
         class LocalSingleLineListener : TextWriterTraceListener {
-            public LocalSingleLineListener(string file) : base(file) {
+            // roep base aan om een stream de maken zonder exclusive lock
+            public LocalSingleLineListener(string file) : base(new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) {
                 TraceOutputOptions = TraceOptions.DateTime | TraceOptions.LogicalOperationStack;
             }
 
