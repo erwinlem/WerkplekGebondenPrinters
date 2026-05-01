@@ -58,7 +58,7 @@ namespace WerkplekGebondenPrinter {
                 // Citrix gebruikt CSWorkStationName
                 // Windows gebruikt CLIENTNAME
                 // todo: Omnissa zou ook CSWorkStationName moeten gebruiken
-		try {
+                try {
                     return (Registry.GetValue(@"HKEY_CURRENT_USER\Volatile Environment", "CSWorkStationName", Environment.GetEnvironmentVariable("CLIENTNAME"))).ToString();
                 } catch {
                     return "ERROR-GETTING-HOSTNAME";
@@ -108,7 +108,6 @@ namespace WerkplekGebondenPrinter {
             } catch (Win32Exception e) {
                 Trace.TraceError("fout printers ophalen, spooler disabled?");
                 return new List<string> { "error" };
-
             }
         }
 
@@ -331,7 +330,7 @@ namespace WerkplekGebondenPrinter {
 
             foreach (var p in tmp) {
                 printerTypeTable.Rows.Add(p.Type, p.Printer, p.Location);
-                Trace.WriteLine(p);
+                Trace.TraceInformation(p.ToString());
             }
 
             // computer printers
@@ -341,6 +340,7 @@ namespace WerkplekGebondenPrinter {
                 }
             } catch (Win32Exception e) {
                 // printspooler waarschijk disabled, TODO: vullen met dummy
+                Trace.TraceError("printspooler waarschijk disabled, fout bij ophalen printers"+e.Message);
 
             }
         }
@@ -458,13 +458,12 @@ namespace WerkplekGebondenPrinter {
         class LocalSingleLineListener : TextWriterTraceListener {
             // roep base aan om een stream de maken zonder exclusive lock
             public LocalSingleLineListener(string file) : base(new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) {
-                TraceOutputOptions = TraceOptions.DateTime | TraceOptions.LogicalOperationStack;
             }
 
             public override void TraceEvent(TraceEventCache eventCache, string source,
                                             TraceEventType eventType, int id, string message) {
-                message = message?.Replace("\r", " ").Replace("\n", " ");
-                base.TraceEvent(eventCache, source, eventType, id, message);
+                // we willen wel dat het op 1 regel past
+                WriteLine($"[{source}:{Process.GetCurrentProcess().Id}] {id}: {eventCache.DateTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")} {eventType}: {message}");
             }
         }
 
@@ -510,7 +509,7 @@ namespace WerkplekGebondenPrinter {
         [STAThread]
         public static int Main(string[] args) {
             Trace.AutoFlush = true;
-            Trace.TraceInformation("Werkplekgebonenprinter wordt opgestart");
+            Trace.TraceWarning("Werkplekgebonenprinter wordt opgestart");
 
             ParseArguments(args);
             Config.config = new Config();
@@ -525,7 +524,7 @@ namespace WerkplekGebondenPrinter {
                 Trace.TraceError($"Algemene fout: {ex.Message}");
                 Trace.TraceError($"stacktrace: {ex.StackTrace}");
             }
-            Trace.WriteLine("Werkplekgebonenprinter wordt afgesloten");
+            Trace.TraceWarning("Werkplekgebonenprinter wordt afgesloten");
             return 0;
         }
     }
