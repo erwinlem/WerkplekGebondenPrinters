@@ -14,10 +14,13 @@ hierdoor direct de juiste printer gebruiken voor een bepaald etiket.
 
 # Implementatie
 
-Het geheel is gebouwd in powershell, printers worden uitgelezen uit active
-directory.  Als opslag worden files gebruikt met de hostname.
+Het is gebouwd in c# met xaml als grafische schil. Allemaal .net 4.8 omdat hix
+toch ook 4.8 is. Het handigste is om Microsoft SQL server te gebruiken als
+backen, maar files zijn zijn ook mogelijk om makkelijk te kunnen testen.
 
-Powershell is echt te traag bij het opstarten, omgezet naar c#.
+De beschikbare printers worden direct uit active directory gehaald, dit maakt
+het makkelijk om te publiceren of in te trekken. Op de printserver -> "list in
+active directory" en klaar.
 
 ## Hoe ziet het eruit?
 
@@ -29,10 +32,7 @@ Powershell is echt te traag bij het opstarten, omgezet naar c#.
 
 # Verbeterpunten
 
-* Script maken wat aangeroepen kan worden als er gewisseld wordt van werkplek.
 * Filteren op hostname zodat thuiswerkers hun machine namen er niet inkomen (bijv. wr_b81oiunmoul).
-* Meer feedback over wat er op de achtergrond gebeurd (printers toevoegen gaat
-  niet snel).
 * Config file met instellingen.
 * Details over printer bij selecteren (printserver/sticker type etc).
 * Server naam meenemen zodat dezelfde printernamen gebruikt kunnen worden.
@@ -45,4 +45,9 @@ Standaard kan je get direct starten met `WerkplekGebondenPrinter.exe`
 Je kan kiezen om andere loaders te gebruiken zoals active directory of sql :
 `
 WerkplekGebondenPrinter-0.1.0.exe -d  -l h:\wpg-client.txt --cwd u:\Werkplekgebondenprinter2 --PrinterLoader PrinterLoaderAD
+`
+
+En als je de printers wil verversen (bij inloggen of wisselen van werkplek).
+`
+WerkplekGebondenPrinter.exe --sync -l h:\wpg-sync.txt --cwd u:\Werkplekgebondenprinter2
 `

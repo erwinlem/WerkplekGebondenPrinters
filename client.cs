@@ -18,7 +18,6 @@ using System.Windows.Forms;
 using System.Windows.Markup;
 using System.Windows.Media.Imaging;
 using System.Xml;
-using System.Xml.Linq;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
 using Control = System.Windows.Controls.Control;
@@ -179,16 +178,16 @@ namespace WerkplekGebondenPrinter {
                 // geen aanpassing, dus geen popup nodig
                 return;
             }
-            NotifyIcon notifyIcon1 = new NotifyIcon();
-            notifyIcon1.Visible = true;
-            notifyIcon1.Icon = SystemIcons.Information;
-            notifyIcon1.BalloonTipTitle = "Printers zijn aangepast";
-            notifyIcon1.BalloonTipText = message;
-            notifyIcon1.BalloonTipIcon = ToolTipIcon.None;
+            var notifyIcon1 = new NotifyIcon {
+                Visible = true,
+                Icon = SystemIcons.Information,
+                BalloonTipTitle = "Printers zijn aangepast",
+                BalloonTipText = message,
+                BalloonTipIcon = ToolTipIcon.None
+            };
             notifyIcon1.ShowBalloonTip(5000);
         }
 
-        #region add/remove printer
         public static void AddPrinter(string printerPath) {
             try {
                 Trace.TraceInformation($"Adding Printer {printerPath}");
@@ -217,8 +216,6 @@ namespace WerkplekGebondenPrinter {
                 Trace.TraceInformation($"Failed to remove printer {printerName}: {ex.Message}");
             }
         }
-        #endregion
-
     }
 
     public class WindowData {
@@ -248,8 +245,12 @@ namespace WerkplekGebondenPrinter {
 
     public class MainWindow : System.Windows.Window {
         private WindowData viewModel = new WindowData();
-        private DataTable printerTable = new DataTable();
-        private DataTable printerTypeTable = new DataTable();
+        private DataTable printerTable = new DataTable() {
+            Columns = { "printername", "description", "location" }
+        };
+        private DataTable printerTypeTable = new DataTable() {
+            Columns = { "Type", "Printer", "Location" }
+        };
         private string selectedType = "";
 
         public MainWindow() {
@@ -272,27 +273,13 @@ namespace WerkplekGebondenPrinter {
 
             DataContext = viewModel;
 
-            printerTable.Columns.Add("PrinterName");
-            printerTable.Columns.Add("Description");
-            printerTable.Columns.Add("Location");
-
-            printerTypeTable.Columns.Add("Type");
-            printerTypeTable.Columns.Add("Printer");
-            printerTypeTable.Columns.Add("Location");
-
             LoadPrinters();
             SetupUI();
             this.Title = Assembly.GetEntryAssembly()?.GetName().Name.Replace('-',' ');
         }
 
         public void clearPrinter(string type) {
-            DataRow[] pt = printerTypeTable.Select("Type = '" + type + "'");
-            if (pt.Length == 0) {
-                return; // printer type niet gevonden
-            }
-            pt[0][1] = "";
-            pt[0][2] = "";
-
+            Array.ForEach(printerTypeTable.Select($"Type = '{type}'"), x => x[1] = x[2] = "");
         }
 
         public void setPrinter(string p) {
