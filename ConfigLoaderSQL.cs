@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
@@ -68,6 +69,50 @@ create table WerkplekPrinters (
                     transaction.Rollback();
                     Trace.TraceError("Transaction rolled back due to error: " + ex.Message);
                 }
+            }
+        }
+    }
+
+    /*
+    -- ja, ik weet het, max is slecht
+CREATE TABLE[Logs] (
+        [id] INT IDENTITY(1,1) PRIMARY KEY,
+    [timestamp] DATETIME DEFAULT GETDATE(),
+    [message] NVARCHAR(max),
+    [category] NVARCHAR(max) NULL,
+	[machineName] NVARCHAR(max) NULL,
+    [userName] NVARCHAR(max) NULL
+   );
+    */
+    public class SqlTraceListener : TraceListener {
+        public override void Write(string message) => LogToDatabase(message, null);
+        public override void WriteLine(string message) => LogToDatabase(message, null);
+
+        public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string message) {
+            LogToDatabase(message, eventType.ToString());
+        }
+
+        private void LogToDatabase(string message, string category) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            const string query = @"
+            INSERT INTO Logs (Message, Category, MachineName, UserName) 
+            VALUES (@Message, @Category, @MachineName, @UserName)";
+
+            try {
+                using (var connection = new SqlConnection(Config.Settings["ConfigLoaderSQL.connectionString"])) {
+                    connection.Open();
+                    using (var command = new SqlCommand(query, connection)) {
+                        command.Parameters.AddWithValue("@Message", message);
+                        command.Parameters.AddWithValue("@Category", (object)category ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@MachineName", Config.Hostname);
+                        command.Parameters.AddWithValue("@UserName", Environment.UserName);
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            } catch {
+                // Fail-safe
             }
         }
     }

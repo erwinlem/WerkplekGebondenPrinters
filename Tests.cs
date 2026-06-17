@@ -37,6 +37,15 @@ namespace WerkplekGebondenPrinter {
             cl.SavePrinters();
         }
 
+
+        [TestMethod]
+        public void Test_SQLLog() {
+            App.ParseArguments(ConfigurationManager.AppSettings);
+            IConfigLoader cl = new ConfigLoaderSQL();
+            Trace.Listeners.Add(new SqlTraceListener());
+            Trace.TraceInformation("unit test log");
+        }
+
         [TestMethod]
         public void Test_AD() {
             Config c = new Config();

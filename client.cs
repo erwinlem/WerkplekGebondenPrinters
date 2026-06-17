@@ -486,11 +486,16 @@ namespace WerkplekGebondenPrinter {
                     case "-l":
                         Trace.Listeners.Add(new LocalSingleLineListener(args[++i]));
                         break;
+                    case "--logSQL":
+                        Trace.Listeners.Add(new SqlTraceListener());
+                        break;
                     default:
                         Trace.TraceError($"Unknown argument: {args[i]}");
                         break;
                 }
             }
+            
+
         }
 
         [STAThread]
