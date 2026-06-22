@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace WerkplekGebondenPrinter {
 
@@ -25,11 +26,12 @@ create table WerkplekPrinters (
         public List<string> Printers { get => printers; set => printers = value; }
 
         public void LoadPrinters() {
+            printers.Clear();
             DataSet dataset = new DataSet();
             using (SqlConnection connection = new SqlConnection(Config.Settings["ConfigLoaderSQL.connectionString"])) {
                 SqlDataAdapter adapter = new SqlDataAdapter();
-#warning sql inject
-                adapter.SelectCommand = new SqlCommand("select printer from WerkplekPrinters where werkplek = '"+System.Environment.MachineName+"'", connection);
+                adapter.SelectCommand = new SqlCommand("select printer from WerkplekPrinters where werkplek = @werkplek", connection);
+                adapter.SelectCommand.Parameters.AddWithValue("@werkplek", Config.Hostname);
                 adapter.Fill(dataset);
                 foreach (DataRow row in dataset.Tables[0].Rows) {
                     printers.Add((string)row[0]);

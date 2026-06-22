@@ -25,6 +25,7 @@ using Control = System.Windows.Controls.Control;
 using DataGrid = System.Windows.Controls.DataGrid;
 using Image = System.Windows.Controls.Image;
 using TextBox = System.Windows.Controls.TextBox;
+using Timer = System.Timers.Timer;
 
 namespace WerkplekGebondenPrinter {
 
@@ -115,7 +116,7 @@ namespace WerkplekGebondenPrinter {
             werkplekPrinter.SavePrinters();
         }
 
-        public void ApplyConfig() {
+        public void LoadConfig() {
             werkplekPrinter.LoadPrinters();
             ApplyPrintlist(werkplekPrinter.Printers, GetInstalledWPGPrinters());
         }
@@ -275,6 +276,7 @@ namespace WerkplekGebondenPrinter {
 
             DataContext = viewModel;
 
+            Config.config.LoadConfig();
             LoadPrinters();
             SetupUI();
             this.Title = Assembly.GetEntryAssembly()?.GetName().Name.Replace('-',' ');
@@ -291,6 +293,7 @@ namespace WerkplekGebondenPrinter {
                 Trace.TraceInformation($"hostname is veranderd {LastHostname} -> {Config.Hostname}");
                 LastHostname = Config.Hostname;
                 this.Dispatcher.BeginInvoke((Action)delegate {
+                    Config.config.LoadConfig();
                     LoadPrinters();
                 });
             }
@@ -533,7 +536,7 @@ namespace WerkplekGebondenPrinter {
 
             try {
                 if (sync) {
-                    Config.config.ApplyConfig();
+                    Config.config.LoadConfig();
                 } else {
                     (new App()).Run(new MainWindow());
                 }
