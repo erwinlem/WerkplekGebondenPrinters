@@ -12,6 +12,7 @@ using System.Linq;
 using System.Management;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
@@ -49,7 +50,6 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class Config {
-
         public static string Hostname {
             get {
                 // wanneer explorer al geopend is wordt clientname niet geupdate binnen die explorer.exe
@@ -219,7 +219,7 @@ namespace WerkplekGebondenPrinter {
     }
 
     public class WindowData {
-        public string TB_Werkplek { get; set; } = "Werkplek - " + Config.Hostname;
+        public string TB_Werkplek { get; set; }
         public string TB_Filter { get; set; }
 
         public void HandleButtonClick(string name, MainWindow window) {
@@ -253,6 +253,8 @@ namespace WerkplekGebondenPrinter {
         };
         private string selectedType = "";
 
+        private Timer hostnameChangedWatcher;
+
         public MainWindow() {
             // standaard marge voor alle elementen
             // Buttons, TextBox, DataGrid, etc.
@@ -276,6 +278,22 @@ namespace WerkplekGebondenPrinter {
             LoadPrinters();
             SetupUI();
             this.Title = Assembly.GetEntryAssembly()?.GetName().Name.Replace('-',' ');
+
+            // vang sessionswitch af voor als iemand wisseld van werkplek
+            hostnameChangedWatcher = new Timer(1000);
+            hostnameChangedWatcher.Elapsed += OnTimedEvent;
+            hostnameChangedWatcher.Start();
+        }
+
+        string LastHostname = Config.Hostname;
+        private void OnTimedEvent(Object source, ElapsedEventArgs e) {
+            if (LastHostname != Config.Hostname) {
+                Trace.TraceInformation($"hostname is veranderd {LastHostname} -> {Config.Hostname}");
+                LastHostname = Config.Hostname;
+                this.Dispatcher.BeginInvoke((Action)delegate {
+                    LoadPrinters();
+                });
+            }
         }
 
         public void clearPrinter(string type) {
@@ -299,6 +317,8 @@ namespace WerkplekGebondenPrinter {
         }
 
         public void LoadPrinters() {
+            viewModel.TB_Werkplek = "Werkplek - " + Config.Hostname;
+
             printerTable.Clear();
 
             foreach (var p in Config.config.Printers)
@@ -330,6 +350,11 @@ namespace WerkplekGebondenPrinter {
                 Trace.TraceError("printspooler waarschijk disabled, fout bij ophalen printers"+e.Message);
 
             }
+
+            // ververs labeltjes enzo, gaat niet vanzelf.
+            var currentData = this.DataContext;
+            this.DataContext = null;
+            this.DataContext = currentData;
         }
 
         string xaml = @"
